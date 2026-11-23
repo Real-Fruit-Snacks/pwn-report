@@ -169,12 +169,15 @@ def test_building_the_model_decompresses_the_archive_twice_at_most(tmp_path, mon
     assert sum(read) <= 2.2 * size, (sum(read), size)
 
 
-def test_the_target_files_are_not_all_held_in_memory_at_once(tmp_path):
+def test_the_target_files_are_not_all_held_in_memory_at_once(tmp_path, monkeypatch):
     # each target.toml may be up to 1 MiB; holding every one's bytes until the end cost a MiB a
-    # target, so a small archive of many padded targets took hundreds of MiB
+    # target, so a small archive of many padded targets took hundreds of MiB. The limit on the
+    # target files together is raised here, so only the reading is measured
     import tracemalloc
 
     from fixtures import _target_toml, add_members
+
+    monkeypatch.setattr(report, "MAX_TARGETS_BYTES", 64 * 1024 * 1024)
 
     base = make_archive(tmp_path / "base.tar.gz", full=True)
     members = {path: data for path, data in base.members.items() if path != "manifest.toml"}

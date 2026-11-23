@@ -1079,3 +1079,45 @@ def test_a_folder_made_at_the_output_before_staging_is_not_taken_for_the_report(
     assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
     captured = capsys.readouterr()
     assert captured.out == "" and captured.err == "fail  interrupted; no report was written\n"
+
+
+@pytest.mark.skipif(not hasattr(os, "kill") or os.name == "nt", reason="needs POSIX signals to send together")
+def test_stops_that_land_together_print_one_line(tmp_path, capsys, monkeypatch):
+    # SIGTERM and SIGHUP held back and let go at once: both are on their way when the first is
+    # handled, and setting the other to be ignored from the handler made Python print an error
+    import signal
+    import time
+
+    from pwn_report import output
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    both = {signal.SIGTERM, signal.SIGHUP}
+
+    def stopped(*args, **kwargs):
+        signal.pthread_sigmask(signal.SIG_BLOCK, both)
+        os.kill(os.getpid(), signal.SIGTERM)
+        os.kill(os.getpid(), signal.SIGHUP)
+        signal.pthread_sigmask(signal.SIG_UNBLOCK, both)
+        time.sleep(5)
+
+    monkeypatch.setattr(output, "_validate_staging", stopped)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
+    assert capsys.readouterr().err == "fail  interrupted; no report was written\n"
+    assert not list(tmp_path.glob(".out.tmp-*"))
+
+
+def test_a_stop_with_a_report_already_at_the_output_is_not_taken_for_this_one(tmp_path, capsys, monkeypatch):
+    # a report from an earlier run is at the output; this build is stopped before it refuses it,
+    # and that earlier report is not this build's
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    (tmp_path / "out").mkdir()
+    (tmp_path / "out" / "SHA256SUMS").write_bytes(b"")
+    (tmp_path / "out" / "report.toml").write_bytes(b"")
+
+    def stopped(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "build_report", stopped)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == "fail  interrupted; no report was written\n"

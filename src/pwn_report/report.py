@@ -25,9 +25,10 @@ MAX_NAME_BYTES = 4096
 MAX_NAMES_BYTES = 64 * 1024 * 1024
 MAX_TOML_BYTES = 64 * 1024 * 1024
 MAX_SMALL_TOML_BYTES = 1024 * 1024
-# all of a box's target.toml files together, as much as its manifest may be: each address in
-# one is kept, so without it a small crafted archive of many full targets took gigabytes
-MAX_TARGETS_BYTES = MAX_TOML_BYTES
+# all of a box's target.toml files together: a real one is a few hundred bytes, so this holds
+# thousands of targets, and every address and host name in them is kept, so without it a small
+# crafted archive of many full targets took gigabytes
+MAX_TARGETS_BYTES = 4 * 1024 * 1024
 MAX_OWNER = 2**32 - 1
 READ_BYTES = 64 * 1024
 ENTRY_HEADER_BYTES = 16 * 1024

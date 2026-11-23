@@ -116,16 +116,20 @@ def _is_report(output: Path) -> bool:
 def _stop_on_signals(previous: dict) -> None:
     """Ctrl-C (SIGINT), SIGTERM (pwn-broker's timeout, a kill) and SIGHUP (a closed terminal or SSH
     session) end the build with KeyboardInterrupt, so its staging folder is removed; by default
-    SIGTERM and SIGHUP end it on the spot. The first stop wins and the rest are ignored from then
-    on, so a second cannot cut the removal short. A signal the caller ignores, as nohup ignores
+    SIGTERM and SIGHUP end it on the spot. The first stop wins and every later one returns at
+    once, so a second cannot cut the removal short. A signal the caller ignores, as nohup ignores
     SIGHUP, stays ignored, and one whose handler Python cannot put back is left alone. Each
     handler replaced is recorded in previous, to be put back."""
 
+    stopped: list = []
+
     def stop(signum, frame) -> None:
-        # only the handlers still this one: one already put back is the caller's again
-        for number in previous:
-            if signal.getsignal(number) is stop:
-                signal.signal(number, signal.SIG_IGN)
+        # the first stop wins, and the rest return at once. No handler is changed from in here:
+        # setting the others to be ignored raced with a second signal already on its way, and
+        # Python printed an error for it
+        if stopped:
+            return
+        stopped.append(signum)
         raise KeyboardInterrupt
 
     for name in ("SIGINT", "SIGTERM", "SIGHUP"):
