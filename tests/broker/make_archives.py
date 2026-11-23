@@ -26,8 +26,11 @@ from pwn_broker.console import FakeConsole  # noqa: E402
 from pwn_broker.paths import AppPaths  # noqa: E402
 from pwn_broker.shell.commands import dispatch  # noqa: E402
 
-# the night the clocks go back, so the timeline crosses an offset change as a real box can
+# the night the clocks go back: US Eastern time is -04:00 until 06:00 UTC on 2026-11-01 and -05:00
+# after, so a box worked across it records times in both offsets, as a real one can
 STARTED = datetime(2026, 11, 1, 0, 30, tzinfo=timezone(timedelta(hours=-4)))
+CLOCKS_GO_BACK = datetime(2026, 11, 1, 6, 0, tzinfo=timezone.utc)
+SUMMER, WINTER = timezone(timedelta(hours=-4)), timezone(timedelta(hours=-5))
 
 # what a report must never contain: the contents of held-back files
 CANARIES = {
@@ -38,8 +41,14 @@ CANARIES = {
 
 
 def _clock(start: datetime):
-    moments = iter(start + timedelta(minutes=5 * n) for n in range(10_000))
-    return lambda: next(moments)
+    """25 minutes a call, each moment in the offset the wall clock showed then."""
+    instants = iter(start + timedelta(minutes=25 * n) for n in range(10_000))
+
+    def now() -> datetime:
+        instant = next(instants)
+        return instant.astimezone(SUMMER if instant < CLOCKS_GO_BACK else WINTER)
+
+    return now
 
 
 def _session(paths: AppPaths, box, clock):

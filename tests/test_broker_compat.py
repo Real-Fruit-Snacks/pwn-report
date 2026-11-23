@@ -86,5 +86,9 @@ def test_the_timeline_crosses_the_clock_change_in_order(archives, tmp_path):
     from datetime import datetime
 
     model = build_report(archives["finished"], tmp_path / "out")
-    instants = [datetime.fromisoformat(event["at"]) for event in model["timeline"]]
+    times = [event["at"] for event in model["timeline"]]
+    # the box really crosses the change: both offsets, and an order that text alone would get wrong
+    assert {time[-6:] for time in times} == {"-04:00", "-05:00"}
+    assert sorted(times) != times
+    instants = [datetime.fromisoformat(time) for time in times]
     assert instants == sorted(instants)
