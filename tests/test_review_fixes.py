@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import gzip
+import os
+import sys
 import hashlib
 import zlib
 
@@ -176,3 +178,60 @@ def test_control_and_format_characters_never_reach_report_md(tmp_path):
     text = (tmp_path / "out" / "report.md").read_text(encoding="utf-8")
     assert "\x1b" not in text and "\u202e" not in text
     assert "- Caption: seen ?\\[31mred? here\n" in text
+
+
+
+@pytest.mark.parametrize(
+    "path, part",
+    [
+        ("evidence/targets/aux/scans/nmap.txt", "aux"),
+        ("evidence/targets/dc01/scans/CON.txt", "CON.txt"),
+        ("evidence/targets/dc01/scans/com1", "com1"),
+        ("evidence/targets/dc01/scans/report.", "report."),
+        ("evidence/targets/dc01/scans/trailing ", "trailing "),
+        ("evidence/targets/dc01/scans/a:b.txt", "a:b.txt"),
+        ("evidence/targets/dc01/scans/what?.txt", "what?.txt"),
+    ],
+)
+def test_names_windows_refuses_are_named(path, part):
+    from pwn_report import output
+
+    problem = output._unwritable([path], windows=True, folds_case=False)
+    assert problem is not None and repr(part) in problem and path.removeprefix("evidence/") in problem
+    assert output._unwritable([path], windows=False, folds_case=False) is None
+
+
+def test_files_that_differ_only_in_case_are_named_together():
+    from pwn_report import output
+
+    paths = ["evidence/targets/dc01/scans/Nmap.txt", "evidence/targets/dc01/scans/nmap.txt"]
+    problem = output._unwritable(paths, windows=False, folds_case=True)
+    assert problem is not None
+    assert "targets/dc01/scans/Nmap.txt" in problem and "targets/dc01/scans/nmap.txt" in problem
+    assert "differ only in case" in problem
+    assert output._unwritable(paths, windows=False, folds_case=False) is None
+
+
+def test_folders_that_differ_only_in_case_are_named_together():
+    from pwn_report import output
+
+    paths = ["evidence/targets/DC01/scans/a.txt", "evidence/targets/dc01/scans/b.txt"]
+    problem = output._unwritable(paths, windows=False, folds_case=True)
+    assert problem is not None and "targets/DC01" in problem and "targets/dc01" in problem
+
+
+def test_names_that_differ_only_in_unicode_form_are_named_together():
+    from pwn_report import output
+
+    composed, decomposed = "evidence/scans/café.txt", "evidence/scans/café.txt"
+    assert output._unwritable([composed, decomposed], windows=False, folds_case=True) is not None
+
+
+@pytest.mark.skipif(os.name != "nt" and sys.platform != "darwin", reason="only a case-folding file system clashes")
+def test_a_case_clash_fails_before_anything_is_written(tmp_path):
+    clash = {"targets/dc01/scans/Ports.txt": b"UPPER", "targets/dc01/scans/ports.txt": b"LOWER"}
+    archive = _with_listed(tmp_path, clash, targets={path: "dc01" for path in clash}, name="clash")
+    with pytest.raises(ReportError, match="differ only in case"):
+        build_report(archive, tmp_path / "out")
+    assert not (tmp_path / "out").exists()
+    assert not list(tmp_path.glob(".out.tmp-*"))

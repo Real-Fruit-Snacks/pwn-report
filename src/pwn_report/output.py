@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import tarfile
 import zlib
 import tempfile
@@ -26,6 +27,10 @@ PRIVACY_NOTE = (
 )
 _LINK = re.compile(r"(?<!\\)\[[^\]\n]*(?<!\\)\]\(([^)\s]+)\)")
 _CHECKSUM_ROW = re.compile(r"^([0-9a-f]{64})  (.+)$")
+# device names Windows reserves in every folder, with or without an extension
+_WINDOWS_RESERVED = re.compile(r"^(?:con|prn|aux|nul|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3])(?:\..*)?$", re.I)
+_WINDOWS_REFUSED = frozenset('<>:"|?*')
+NEXT_STEP = "exclude one with a selection rule, or build the report on Linux"
 
 
 def _canonical_json(model: dict) -> bytes:
@@ -190,6 +195,40 @@ def _render_markdown(model: dict) -> bytes:
     return ("\n".join(lines).rstrip("\n") + "\n").encode("utf-8")
 
 
+def _source_name(relative: str) -> str:
+    return relative.removeprefix("evidence/")
+
+
+def _unwritable(relatives: list[str], *, windows: bool, folds_case: bool) -> str | None:
+    """Why this system cannot hold these output paths, naming the files, or None.
+
+    Windows refuses its device names (CON, aux.txt, com1), a name ending in a dot or a space,
+    and the characters <>:"|?*. A case-folding file system (Windows, macOS) holds two names
+    that differ only in case, or only in Unicode form, as one: their files or folders would merge.
+    """
+    if windows:
+        for relative in sorted(relatives):
+            for part in relative.split("/"):
+                if _WINDOWS_RESERVED.match(part) or part.endswith((".", " ")) or _WINDOWS_REFUSED & set(part):
+                    return (
+                        f"{_source_name(relative)} cannot be written here: Windows refuses the name {part!r}; "
+                        f"{NEXT_STEP}"
+                    )
+    if folds_case:
+        seen: dict[str, str] = {}
+        for relative in sorted(relatives):
+            parts = relative.split("/")
+            for depth in range(1, len(parts) + 1):
+                name = "/".join(parts[:depth])
+                key = unicodedata.normalize("NFC", name).casefold()
+                if seen.setdefault(key, name) != name:
+                    return (
+                        f"{_source_name(seen[key])} and {_source_name(name)} differ only in case or in "
+                        f"Unicode form, which this system's file names cannot tell apart; {NEXT_STEP}"
+                    )
+    return None
+
+
 def _output_path(root: Path, relative: str) -> Path:
     return root.joinpath(*PurePosixPath(relative).parts)
 
@@ -324,6 +363,13 @@ def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
         copied[model["notes"]["report_path"]] = "notes.md"
         copied_sizes[model["notes"]["report_path"]] = model["notes"]["size"]
 
+    problem = _unwritable(
+        sorted(set(files) | set(copied) | {"SHA256SUMS"}),
+        windows=os.name == "nt",
+        folds_case=os.name == "nt" or sys.platform == "darwin",
+    )
+    if problem is not None:
+        raise ReportError(problem)
     required = _required_bytes(files, copied_sizes)
     free = shutil.disk_usage(output.parent).free
     if required > free:
