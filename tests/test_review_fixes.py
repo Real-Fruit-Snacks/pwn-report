@@ -436,3 +436,23 @@ def test_the_validator_refuses_what_the_reader_refuses(value):
     assert not report.is_portable(value)
     with pytest.raises(ReportError):
         validate._path(value, "path")
+
+
+
+@pytest.mark.parametrize("name", ["CON", "aux.report", "report.", "report ", "a:b"])
+def test_a_report_folder_name_windows_refuses_is_refused_by_name(name):
+    from pwn_report import output
+
+    problem = output._unwritable_output(name, windows=True)
+    assert problem is not None and repr(name) in problem and "-o" in problem
+    assert output._unwritable_output(name, windows=False) is None
+    assert output._unwritable_output("2026-11-14_htb_forest.finished.report", windows=True) is None
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows refuses these names")
+@pytest.mark.parametrize("name", ["CON", "report."])
+def test_on_windows_such_a_folder_is_never_made(tmp_path, name):
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    with pytest.raises(ReportError, match="-o"):
+        build_report(fixture.path, tmp_path / name)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["a.tar.gz"]

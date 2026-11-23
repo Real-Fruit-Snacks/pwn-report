@@ -255,6 +255,14 @@ def _unwritable(relatives: list[str], *, windows: bool, folds_case: bool) -> str
     return None
 
 
+def _unwritable_output(name: str, *, windows: bool) -> str | None:
+    """Why the report folder's own name cannot be made here, or None: Windows makes CON a device,
+    and drops a trailing dot or space, so the folder would not be the one asked for."""
+    if windows and (_WINDOWS_RESERVED.match(name) or name.endswith((".", " ")) or _WINDOWS_REFUSED & set(name)):
+        return f"the report folder's name {name!r} is one Windows refuses or changes; give another with -o"
+    return None
+
+
 def _output_path(root: Path, relative: str) -> Path:
     return root.joinpath(*PurePosixPath(relative).parts)
 
@@ -371,6 +379,9 @@ def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
         raise ReportError(f"output already exists and will not be replaced: {output}")
     if not output.parent.is_dir():
         raise ReportError(f"output parent is not an existing directory: {output.parent}")
+    problem = _unwritable_output(output.name, windows=os.name == "nt")
+    if problem is not None:
+        raise ReportError(problem)
 
     model = validate_model(build_model(archive, selection))
     files = {
