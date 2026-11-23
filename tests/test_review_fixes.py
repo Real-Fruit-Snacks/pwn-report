@@ -758,3 +758,63 @@ def test_a_stop_while_the_handlers_are_set_is_one_line(tmp_path, capsys, monkeyp
     assert status == 130
     assert capsys.readouterr().err == "fail  interrupted; no report was written\n"
     assert not (tmp_path / "out").exists() and not list(tmp_path.glob(".out.tmp-*"))
+
+
+def test_a_stop_while_a_failed_build_is_cleaned_up_still_cleans_up(tmp_path, capsys, monkeypatch):
+    # the build fails, and the first stop (pwn-broker's timeout, say) lands while its staging copy
+    # is being removed: the removal still runs to its end
+    import shutil
+    import signal
+
+    from pwn_report import output
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    real_rmtree = shutil.rmtree
+
+    def failed(*args, **kwargs):
+        raise ReportError("staged asset evidence/x has the wrong checksum")
+
+    def rmtree(*args, **kwargs):
+        signal.raise_signal(signal.SIGINT)
+        return real_rmtree(*args, **kwargs)
+
+    monkeypatch.setattr(output, "_validate_staging", failed)
+    monkeypatch.setattr(output.shutil, "rmtree", rmtree)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
+    assert capsys.readouterr().err == "fail  interrupted; no report was written\n"
+    assert not (tmp_path / "out").exists() and not list(tmp_path.glob(".out.tmp-*"))
+
+
+def test_a_stop_once_the_build_is_done_still_reports_the_report(tmp_path, capsys, monkeypatch):
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    real = cli._put_back
+
+    def put_back(previous):
+        real(previous)
+        raise KeyboardInterrupt  # the stop lands as the handlers are put back, the report in place
+
+    monkeypatch.setattr(cli, "_put_back", put_back)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == f"ok    report {tmp_path / 'out'}\n" and captured.err == ""
+
+
+def test_the_target_files_together_are_capped_as_the_manifest_is(tmp_path, monkeypatch):
+    # each target.toml may be 1 MiB and each address in one is kept: without a cap on all of them
+    # together, a small crafted archive of many targets took gigabytes
+    from fixtures import _target_toml
+    from pwn_report import report
+
+    base = make_archive(tmp_path / "base.tar.gz", full=True)
+    members = {path: data for path, data in base.members.items() if path != "manifest.toml"}
+    second = _target_toml().replace(b'name = "dc01"', b'name = "web01"')
+    members["targets/web01/target.toml"] = second
+    records = [*base.records, file_record("targets/web01/target.toml", second, target="web01")]
+    members["manifest.toml"] = manifest_bytes(sorted(records, key=lambda r: r.path), kind=base.kind)
+    archive = write_raw_archive(tmp_path / "two.tar.gz", lambda tar: add_members(tar, members))
+    total = len(base.members["targets/dc01/target.toml"]) + len(second)
+    monkeypatch.setattr(report, "MAX_TARGETS_BYTES", total)
+    assert [target["name"] for target in build_model(archive)["targets"]] == ["dc01", "web01"]
+    monkeypatch.setattr(report, "MAX_TARGETS_BYTES", total - 1)
+    with pytest.raises(ReportError, match="target.toml files together"):
+        build_model(archive)

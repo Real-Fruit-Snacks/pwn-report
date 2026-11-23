@@ -25,6 +25,9 @@ MAX_NAME_BYTES = 4096
 MAX_NAMES_BYTES = 64 * 1024 * 1024
 MAX_TOML_BYTES = 64 * 1024 * 1024
 MAX_SMALL_TOML_BYTES = 1024 * 1024
+# all of a box's target.toml files together, as much as its manifest may be: each address in
+# one is kept, so without it a small crafted archive of many full targets took gigabytes
+MAX_TARGETS_BYTES = MAX_TOML_BYTES
 MAX_OWNER = 2**32 - 1
 READ_BYTES = 64 * 1024
 ENTRY_HEADER_BYTES = 16 * 1024
@@ -592,6 +595,10 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
             used.add("notes.md")
         if "manifest.toml" in records:
             used.add("manifest.toml")
+
+        # from the manifest's sizes, which the members have: refused before any is read
+        if sum(records[path]["size"] for path in target_paths) > MAX_TARGETS_BYTES:
+            raise ReportError(f"the target.toml files together exceed {MAX_TARGETS_BYTES} bytes")
 
         # archive order: a .tar.gz read backwards decompresses again from its start
         targets = []

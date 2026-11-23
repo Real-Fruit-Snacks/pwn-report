@@ -478,9 +478,23 @@ class Interrupted(KeyboardInterrupt):
 
 
 def _remove_stage(stage: Path) -> bool:
-    """Remove the staging folder; True if any of it is still there."""
-    shutil.rmtree(stage, ignore_errors=True)
-    return os.path.lexists(stage)
+    """Remove the staging folder; True if any of it is still there. A stop that lands during the
+    removal, after a failure or a first stop, does not cut it short: the removal is run again (the
+    command ignores every stop after its first, so the next run finishes), and then the stop goes
+    on, naming the folder if any of it is left."""
+    stopped = None
+    for _attempt in range(3):
+        try:
+            shutil.rmtree(stage, ignore_errors=True)
+            break
+        except KeyboardInterrupt as exc:
+            stopped = exc
+    left = os.path.lexists(stage)
+    if stopped is not None:
+        if left:
+            raise Interrupted(stage) from stopped
+        raise stopped
+    return left
 
 
 def build_report(
