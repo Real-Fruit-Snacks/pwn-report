@@ -99,3 +99,19 @@ def test_the_readme_panel_is_there():
     assert sorted(panels) == ["docs/assets/panel-dark.svg", "docs/assets/panel-light.svg"]
     for name in panels:
         assert (ROOT / name).is_file(), name
+
+
+def test_importing_the_panel_script_leaves_the_import_path_alone():
+    import importlib.util
+    import sys
+
+    before = list(sys.path)
+    spec = importlib.util.spec_from_file_location("make_panel_again", DOCS / "art" / "make-panel.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    from collections import Counter
+
+    added = Counter(sys.path) - Counter(before)
+    # tests/ for the fixtures only; src/ only when pwn_report cannot be imported otherwise, and here
+    # it can: a second src/ in front would make a release's run test this checkout, not its wheel
+    assert all(entry.endswith("tests") for entry in added), added

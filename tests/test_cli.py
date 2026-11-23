@@ -106,7 +106,10 @@ def test_usage_error_exits_2(args):
 
 
 def test_python_dash_m():
-    env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
+    import pwn_report
+
+    # the pwn_report these tests import: src/ in a checkout, the installed wheel in a release's run
+    env = {**os.environ, "PYTHONPATH": str(Path(pwn_report.__file__).resolve().parents[1])}
     done = subprocess.run(
         [sys.executable, "-m", "pwn_report", "--version"], capture_output=True, text=True, env=env, timeout=60
     )

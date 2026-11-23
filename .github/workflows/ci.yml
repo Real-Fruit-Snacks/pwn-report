@@ -98,10 +98,15 @@ jobs:
           python -m pip install --quiet -r docs/art/requirements.txt
           python docs/art/make-panel.py --check
       - name: The panel's tests
-        # pytest is not pinned, as in the test jobs: this job holds no token that can write
+        # pytest is not pinned, as in the test jobs: this job holds no token that can write. They
+        # skip without fonttools, so a skip here is a failure: this is the job that runs them
         run: |
           python -m pip install --quiet pytest
-          python -m pytest -q -W error tests/test_panel.py
+          python -m pytest -q -W error tests/test_panel.py | tee "$RUNNER_TEMP/panel.txt"
+          if grep -q skipped "$RUNNER_TEMP/panel.txt"; then
+            echo "fail  the panel's tests were skipped"
+            exit 1
+          fi
 
   build:
     # The sdist and the wheel, built twice with the locked build tools to the same bytes; the

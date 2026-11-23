@@ -25,6 +25,8 @@ def problems(wheel: Path, version: str) -> list[str]:
     info = f"{PACKAGE}-{version}.dist-info"
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
+        for name in sorted({name for name in names if names.count(name) > 1}):
+            found.append(f"{name} is in the wheel more than once")
         for name in names:
             top = name.split("/", 1)[0]
             if top not in {PACKAGE, info}:
@@ -55,6 +57,10 @@ def problems(wheel: Path, version: str) -> list[str]:
         if "Root-Is-Purelib: true" not in wheel_file:
             found.append("WHEEL does not say Root-Is-Purelib: true")
         metadata = text("METADATA").splitlines()
+        # standard library only: no dependency every install brings; an extra's (dev) is optional
+        for line in metadata:
+            if line.startswith("Requires-Dist:") and "extra ==" not in line:
+                found.append(f"METADATA names a dependency, {line!r}")
         if f"Version: {version}" not in metadata:
             stated = next((line for line in metadata if line.startswith("Version:")), "no Version line")
             found.append(f"METADATA says {stated}, not Version: {version}")

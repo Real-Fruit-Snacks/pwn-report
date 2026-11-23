@@ -104,6 +104,11 @@ jobs:
             echo "::error::CHANGELOG.md has no notes under '## v$VERSION'"
             exit 1
           fi
+          # a tag publishes: its heading must say the version alone, not "(unreleased)"
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_TYPE" = tag ] && ! grep -qx "## v$VERSION" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md's heading for v$VERSION still says (unreleased) or is missing"
+            exit 1
+          fi
           cat "$upload/notes.md"
       - name: Set aside what a release publishes
         id: aside

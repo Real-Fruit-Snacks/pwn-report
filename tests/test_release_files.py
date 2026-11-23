@@ -17,7 +17,7 @@ VERSION = "0.1.0"
 
 
 def _wheel(tmp_path, *, name=f"pwn_report-{VERSION}-py3-none-any.whl", extra=None, tag="py3-none-any",
-           version=VERSION, entry="pwn-report = pwn_report.cli:main", drop=()):  # fmt: skip
+           version=VERSION, entry="pwn-report = pwn_report.cli:main", drop=(), requires=""):  # fmt: skip
     info = f"pwn_report-{VERSION}.dist-info"
     files = {
         "pwn_report/__init__.py": f'__version__ = "{version}"\n',
@@ -26,7 +26,7 @@ def _wheel(tmp_path, *, name=f"pwn_report-{VERSION}-py3-none-any.whl", extra=Non
         "pwn_report/output.py": "",
         "pwn_report/report.py": "",
         "pwn_report/validate.py": "",
-        f"{info}/METADATA": f"Metadata-Version: 2.4\nName: pwn-report\nVersion: {version}\n",
+        f"{info}/METADATA": f"Metadata-Version: 2.4\nName: pwn-report\nVersion: {version}\n{requires}",
         f"{info}/WHEEL": f"Wheel-Version: 1.0\nGenerator: hatchling 1.33.0\nRoot-Is-Purelib: true\nTag: {tag}\n",
         f"{info}/entry_points.txt": f"[console_scripts]\n{entry}\n",
         f"{info}/licenses/LICENSE": "MIT License\n",
@@ -57,8 +57,12 @@ def test_check_wheel_accepts_a_pure_wheel_of_the_package(tmp_path):
         ({"version": "0.2.0"}, "0.2.0"),
         ({"entry": "pwn-report = pwn_report.other:main"}, "entry point"),
         ({"drop": ["pwn_report/cli.py"]}, "pwn_report/cli.py"),
+        ({"requires": "Requires-Dist: requests>=2\n"}, "Requires-Dist"),
     ],
-    ids=["extra-module", "compiled", "bytecode", "platform-tag", "file-name", "version", "entry-point", "missing-module"],
+    ids=[
+        "extra-module", "compiled", "bytecode", "platform-tag", "file-name", "version", "entry-point",
+        "missing-module", "a-dependency",
+    ],
 )
 def test_check_wheel_refuses_anything_else(tmp_path, change, expect):
     found = check_wheel.problems(_wheel(tmp_path, **change), VERSION)
@@ -72,3 +76,20 @@ def test_check_wheel_prints_one_line_and_exits_with_the_result(tmp_path, capsys)
     bad = _wheel(tmp_path / "bad", extra={"evil.py": ""})
     assert check_wheel.main([str(bad), VERSION]) == 1
     assert capsys.readouterr().out.startswith("fail  ")
+
+
+def test_check_wheel_refuses_a_member_named_twice(tmp_path):
+    import warnings
+
+    path = _wheel(tmp_path)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # zipfile warns about the duplicate it is asked to write
+        with zipfile.ZipFile(path, "a") as archive:
+            archive.writestr("pwn_report/cli.py", "def main(argv=None):\n    return 1\n")
+    found = check_wheel.problems(path, VERSION)
+    assert any("more than once" in problem for problem in found), found
+
+
+def test_check_wheel_accepts_a_dependency_only_an_extra_brings(tmp_path):
+    path = _wheel(tmp_path, requires="Requires-Dist: pytest>=8; extra == 'dev'\n")
+    assert check_wheel.problems(path, VERSION) == []

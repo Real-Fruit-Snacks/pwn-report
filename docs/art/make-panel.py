@@ -38,6 +38,7 @@ import contextlib
 import io
 import os
 import shutil
+import importlib.util
 import sys
 import tempfile
 from pathlib import Path
@@ -46,7 +47,12 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 FONTS = HERE.parent / "fonts"
 PANELS = {theme: HERE.parent / "assets" / f"panel-{theme}.svg" for theme in ("dark", "light")}
-sys.path[:0] = [str(ROOT / "src"), str(ROOT / "tests")]
+sys.path.insert(0, str(ROOT / "tests"))
+if importlib.util.find_spec("pwn_report") is None:
+    # run from a checkout with nothing installed: this checkout's src/. When pwn_report can be
+    # imported already (pytest, an installed wheel), it is left alone, so a release's run tests
+    # its wheel and not this checkout
+    sys.path.insert(0, str(ROOT / "src"))
 
 import fixtures  # noqa: E402  (the suite's own archive builder)
 from pwn_report import cli, output  # noqa: E402  (this checkout's pwn-report)
