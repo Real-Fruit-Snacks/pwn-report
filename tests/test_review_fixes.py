@@ -1121,3 +1121,21 @@ def test_a_stop_with_a_report_already_at_the_output_is_not_taken_for_this_one(tm
     assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
     captured = capsys.readouterr()
     assert captured.out == "" and captured.err == "fail  interrupted; no report was written\n"
+
+
+def test_target_files_over_4_mib_together_are_refused(tmp_path):
+    from fixtures import _target_toml
+
+    base = make_archive(tmp_path / "base.tar.gz", full=True)
+    members = {path: data for path, data in base.members.items() if path != "manifest.toml"}
+    records = list(base.records)
+    padding = b"# " + b"x" * 1_000_000 + b"\n"
+    for number in range(5):
+        name = f"t{number}"
+        data = _target_toml().replace(b'name = "dc01"', f'name = "{name}"'.encode()) + padding
+        members[f"targets/{name}/target.toml"] = data
+        records.append(file_record(f"targets/{name}/target.toml", data, target=name))
+    members["manifest.toml"] = manifest_bytes(sorted(records, key=lambda r: r.path), kind=base.kind)
+    archive = write_raw_archive(tmp_path / "five.tar.gz", lambda tar: add_members(tar, members))
+    with pytest.raises(ReportError, match="the target.toml files together exceed 4194304 bytes"):
+        build_model(archive)
