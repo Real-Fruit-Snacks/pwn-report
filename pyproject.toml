@@ -46,9 +46,11 @@ packages = ["src/pwn_report"]
 include = [
   "src/pwn_report",
   "tests",
-  # the suite reads the documents and the wheel check, so an sdist can run its own tests
+  # the suite reads the documents, the wheel check and the workflows, so an sdist can run its
+  # own tests
   "docs",
   "release",
+  ".github/workflows",
   "LICENSE",
   "README.md",
   "CHANGELOG.md",

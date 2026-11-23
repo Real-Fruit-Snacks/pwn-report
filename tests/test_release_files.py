@@ -102,3 +102,16 @@ def test_check_wheel_reads_metadata_headers_not_the_readme_after_them(tmp_path):
     wrong = _wheel(tmp_path / "other", version="9.9.9", requires="\nVersion: 0.1.0\n")
     found = check_wheel.problems(wrong, VERSION)
     assert any("Version: 9.9.9" in problem for problem in found), found
+
+
+def test_check_wheel_reads_crlf_metadata_headers_too(tmp_path):
+    readme = "Description-Content-Type: text/markdown\n\n# pwn-report\n\nRequires-Dist: prose in the README\n"
+    path = _wheel(tmp_path, requires=readme)
+    with zipfile.ZipFile(path) as archive:
+        files = {name: archive.read(name) for name in archive.namelist()}
+    info = f"pwn_report-{VERSION}.dist-info/METADATA"
+    files[info] = files[info].replace(b"\n", b"\r\n")
+    with zipfile.ZipFile(path, "w") as archive:
+        for name, data in files.items():
+            archive.writestr(name, data)
+    assert check_wheel.problems(path, VERSION) == []

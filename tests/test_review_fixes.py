@@ -552,6 +552,8 @@ def test_the_report_folder_is_its_owners_alone(tmp_path):
         "{box}/LISTS/SECRET-INNER-NAME",
         "{box}/creds.toml/SECRET-INNER-NAME",
         "lists/SECRET-INNER-NAME",
+        "C:lists/SECRET-INNER-NAME",
+        "C:tooldata\\SECRET-INNER-NAME",
     ],
 )
 def test_an_odd_spelling_of_a_held_back_place_is_still_named_by_the_place(tmp_path, spelled):
@@ -714,6 +716,12 @@ def test_a_stop_just_after_the_rename_still_reports_the_report(tmp_path, capsys,
         "tooldata/../tooldata/SECRET-INNER-NAME",
         "lists/SECRET-INNER-NAME/..",
         "/lists/SECRET-INNER-NAME",
+        "C:lists/SECRET-INNER-NAME",
+        # these pass as paths, and are refused as missing from the archive
+        "lists\\SECRET-INNER-NAME",
+        "LISTS/SECRET-INNER-NAME",
+        "creds.toml/SECRET-INNER-NAME",
+        "targets/dc01/creds\\SECRET-INNER-NAME",
     ],
 )
 def test_a_refused_manifest_row_in_a_held_back_place_is_named_by_the_place(tmp_path, row):
@@ -725,7 +733,7 @@ def test_a_refused_manifest_row_in_a_held_back_place_is_named_by_the_place(tmp_p
         build_model(bad)
     message = str(raised.value)
     assert "SECRET-INNER-NAME" not in message, message
-    assert any(place in message for place in ("lists/", "tooldata/", "targets/dc01/creds/")), message
+    assert any(place in message.casefold() for place in ("lists/", "tooldata/", "creds/", "creds.toml/")), message
 
 
 def test_a_selection_file_name_with_a_line_separator_is_refused(tmp_path):
@@ -744,11 +752,10 @@ def test_a_stop_while_the_handlers_are_set_is_one_line(tmp_path, capsys, monkeyp
     calls = []
 
     def setting(number, handler):
-        previous = real(number, handler)
         calls.append(number)
-        if len(calls) == 1:
-            raise KeyboardInterrupt  # the stop lands once the first handler is set
-        return previous
+        if len(calls) == 2:
+            raise KeyboardInterrupt  # the stop lands with the first handler set, the second not yet
+        return real(number, handler)
 
     monkeypatch.setattr(cli.signal, "signal", setting)
     try:
@@ -758,6 +765,7 @@ def test_a_stop_while_the_handlers_are_set_is_one_line(tmp_path, capsys, monkeyp
     assert status == 130
     assert capsys.readouterr().err == "fail  interrupted; no report was written\n"
     assert not (tmp_path / "out").exists() and not list(tmp_path.glob(".out.tmp-*"))
+    assert [signal.getsignal(number) for number in _stop_signals()] == [_sentinel] * len(_stop_signals())
 
 
 def test_a_stop_while_a_failed_build_is_cleaned_up_still_cleans_up(tmp_path, capsys, monkeypatch):
@@ -818,3 +826,99 @@ def test_the_target_files_together_are_capped_as_the_manifest_is(tmp_path, monke
     monkeypatch.setattr(report, "MAX_TARGETS_BYTES", total - 1)
     with pytest.raises(ReportError, match="target.toml files together"):
         build_model(archive)
+
+
+def test_a_stop_just_after_build_report_returns_still_reports_the_report(tmp_path, capsys, monkeypatch):
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    real = cli.build_report
+
+    def built(*args, **kwargs):
+        model = real(*args, **kwargs)
+        raise KeyboardInterrupt  # the stop lands as build_report returns, the report in place
+        return model
+
+    monkeypatch.setattr(cli, "build_report", built)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == f"ok    report {tmp_path / 'out'}\n" and captured.err == ""
+
+
+def test_a_stop_while_the_handlers_are_put_back_keeps_the_line_and_puts_them_all_back(
+    tmp_path, capsys, monkeypatch, own_handlers
+):
+    # the build is stopped and its staging copy cannot be removed; a second stop that lands as the
+    # caller's handlers are put back (Ctrl-C's own handler, just restored) must not hide the copy
+    import signal
+
+    from pwn_report import output
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+
+    def stopped(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(output, "_validate_staging", stopped)
+    monkeypatch.setattr(output.shutil, "rmtree", lambda *args, **kwargs: None)
+    real = signal.signal
+    fired = []
+
+    def setting(number, handler):
+        previous = real(number, handler)
+        if handler is _sentinel and not fired:
+            fired.append(number)
+            raise KeyboardInterrupt
+        return previous
+
+    monkeypatch.setattr(cli.signal, "signal", setting)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
+    err = capsys.readouterr().err
+    assert err.startswith("fail  interrupted; a partial copy was left at ") and err.count("\n") == 1, err
+    assert fired and [signal.getsignal(n) for n in _stop_signals()] == [_sentinel] * len(_stop_signals())
+    for left in tmp_path.glob(".out.tmp-*"):
+        import shutil
+
+        shutil.rmtree(left)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows has no SIGHUP")
+def test_a_real_stop_while_the_handlers_are_put_back_leaves_none_ignored(tmp_path, capsys, monkeypatch, own_handlers):
+    import signal
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    real = signal.signal
+    restored = []
+
+    def setting(number, handler):
+        previous = real(number, handler)
+        if handler is _sentinel:
+            restored.append(number)
+            if len(restored) == 2:
+                signal.raise_signal(signal.SIGHUP)  # SIGHUP still stops; two are already back
+        return previous
+
+    monkeypatch.setattr(cli.signal, "signal", setting)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 0
+    assert capsys.readouterr().out == f"ok    report {tmp_path / 'out'}\n"
+    assert [signal.getsignal(n) for n in _stop_signals()] == [_sentinel] * len(_stop_signals())
+
+
+def test_a_handler_python_cannot_put_back_is_left_alone(tmp_path, monkeypatch, own_handlers):
+    # getsignal gives None for a handler set outside Python: it could not be put back, so it is kept
+    import signal
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    real_get = signal.getsignal
+    real_set = signal.signal
+    touched = []
+
+    def getting(number):
+        return None if number == signal.SIGTERM else real_get(number)
+
+    def setting(number, handler):
+        touched.append(number)
+        return real_set(number, handler)
+
+    monkeypatch.setattr(cli.signal, "getsignal", getting)
+    monkeypatch.setattr(cli.signal, "signal", setting)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 0
+    assert signal.SIGTERM not in touched and signal.SIGINT in touched

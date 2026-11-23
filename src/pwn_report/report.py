@@ -270,7 +270,8 @@ def _held_back_prefix(name: str) -> str | None:
     is spelled; never used as a path."""
     parts = name.replace("\\", "/").split("/")
     for index, part in enumerate(parts[:-1]):
-        if part.casefold() in _HELD_BACK_PARTS:
+        # a drive letter, or a stream name, can be glued on with a colon: C:lists
+        if any(piece.casefold() in _HELD_BACK_PARTS for piece in part.split(":")):
             return "/".join(kept for kept in parts[: index + 1] if kept not in {"", "."}) + "/"
     return None
 
@@ -516,7 +517,7 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
         for index, row in enumerate(raw_rows):
             record = _record(row, f"manifest.toml file[{index}]")
             path = record["path"]
-            group = held_back_group(path)
+            group = held_back_group(path) or _held_back_prefix(path)
             named = f"a file in {group}" if group else path
             if path in records:
                 raise ReportError(f"{named} is listed twice in manifest.toml")

@@ -8,6 +8,7 @@ command at finish and relies on exactly these lines and statuses.
 from __future__ import annotations
 
 import argparse
+import os
 import signal
 import sys
 from pathlib import Path
@@ -73,20 +74,21 @@ def main(argv: list[str] | None = None) -> int:
     if args.select is not None and not args.select.is_file():
         return _fail(f"no selection file at {args.select}")
     output = args.output if args.output is not None else default_output(archive)
+    # build_report never replaces a folder: if none is here now and one is after a stop, it is the
+    # report, renamed into place whole
+    existed = os.path.lexists(output)
     previous: dict = {}
-    built = False
     try:
         try:
             # inside the try: a stop that lands while they are set is one line too
             _stop_on_signals(previous)
             build_report(archive, output, args.select)
-            built = True
         finally:
             # before any line is printed: a stop from here on meets the caller's own handler, not
             # one that raises out of main with a traceback
             _put_back(previous)
     except KeyboardInterrupt as exc:
-        if not built:
+        if existed or not os.path.isdir(output):
             # build_report removes its staging folder on the way out; one it could not remove is named
             left = getattr(exc, "left", None)
             if left is not None:
@@ -113,8 +115,10 @@ def _stop_on_signals(previous: dict) -> None:
     handler replaced is recorded in previous, to be put back."""
 
     def stop(signum, frame) -> None:
+        # only the handlers still this one: one already put back is the caller's again
         for number in previous:
-            signal.signal(number, signal.SIG_IGN)
+            if signal.getsignal(number) is stop:
+                signal.signal(number, signal.SIG_IGN)
         raise KeyboardInterrupt
 
     for name in ("SIGINT", "SIGTERM", "SIGHUP"):
@@ -132,5 +136,13 @@ def _stop_on_signals(previous: dict) -> None:
 
 
 def _put_back(previous: dict) -> None:
+    """Put the caller's handlers back. A stop that lands meanwhile is let go, and the rest are put
+    back all the same: the build is over, so it has nothing left to stop, and the line about the
+    build, the one naming a staging copy left behind included, still has to be printed."""
     for number, handler in previous.items():
-        signal.signal(number, handler)
+        for _attempt in range(3):
+            try:
+                signal.signal(number, handler)
+                break
+            except KeyboardInterrupt:
+                continue

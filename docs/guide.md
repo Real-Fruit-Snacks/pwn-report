@@ -95,7 +95,7 @@ An evidence ID is `ev_` and the SHA-256 of the box's ID, the file's path and its
 | `box.toml`, `notes.md`, `manifest.toml`, `targets/<t>/target.toml` | read for the report itself; `notes.md` is copied |
 | anything else the manifest lists | shown by path under `Not in the index`, never read |
 
-A folder under `targets/` is a target only if it has its `target.toml`; files in one without it are listed under `Not in the index`. So is a file whose name holds a backslash, a control or format character, such as a zero-width joiner or a right-to-left override, or a line or paragraph separator. Neither stops the report.
+A folder under `targets/` is a target only if it has its `target.toml`; files in one without it are listed under `Not in the index`. So is a file whose name holds a backslash, a control or format character, such as a zero-width joiner or a right-to-left override, or a line or paragraph separator. Neither stops the report; only a NUL character in a name, which no file system allows, stops the build.
 
 `notes.md` and every copied file are copied as they were. pwn-broker's note keys can paste a credential into the note, tool output in `scans/` often shows the passwords it found, a screenshot can show one, and loot a selection copies can hold them, so a report can hold passwords even though it never reads the credential files. It is private, and it says so at the top.
 
