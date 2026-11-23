@@ -71,6 +71,13 @@ On the first push, on 2026-11-23, every job passed:
 
 With the locked build tools, two builds of the same commit gave the same sdist and wheel, byte for byte, and `release/check_wheel.py` accepted the wheel. Every workflow parses and passes `actionlint`.
 
+The v0.1.0 release, on 2026-11-23: the release workflow's dry run on `main` and its run for the tag built the same two files, byte for byte, and the run for the tag published them, after its suite against the built wheel gave 450 passed, 17 skipped:
+
+- `pwn_report-0.1.0-py3-none-any.whl`: `fcf3aacda4cd07076042a3b92a7e5d9eefd966b853d74cf451d8482eaf8c446c`
+- `pwn_report-0.1.0.tar.gz`: `2b011b88e9e3a80cbaaa40c4332babb8cd0f44466da388b4f4244558cff49fcb`
+
+Downloaded from the release and checked against its `SHA256SUMS.txt`, the wheel was installed on its own in a new venv in Kali, as a user would: `pwn-report --version` printed `pwn-report 0.1.0`, and it built reports from a finished box with no targets and from a full finished box, both made by pwn-broker 0.1.11's own code; each report's `SHA256SUMS` held.
+
 ## Known limits
 
 - A private report by design: there is no public writeup mode, no redaction of notes or scans, and no secret scanning.
