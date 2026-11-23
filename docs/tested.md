@@ -4,8 +4,8 @@ Everything pwn-report has been run on, with the counts, versions and dates, and 
 
 ## Unit tests
 
-- On Windows 11 with Python 3.13, the development machine, on 2026-11-23: 387 passed, 6 skipped, with warnings treated as errors and the pwn-broker compatibility tests included; without a pwn-broker checkout those 9 skip too. Of the 6 that skip, 3 are the README panel's, which need fonttools, and 3 only mean something on Linux and macOS: SIGTERM, SIGHUP and a folder's mode.
-- In Kali Rolling under WSL 2, with Python 3.14.7, as a normal user, on 2026-11-23: 389 passed, 4 skipped, with the pwn-broker compatibility tests against pwn-broker 0.1.11 and the panel's tests. The 4 that skip only mean something on Windows and macOS: a backslash as a path separator, two names that differ only in case, and two report folder names Windows refuses.
+- On Windows 11 with Python 3.13, the development machine, on 2026-11-23: 393 passed, 6 skipped, with warnings treated as errors and the pwn-broker compatibility tests included; without a pwn-broker checkout those 9 skip too. Of the 6 that skip, 3 are the README panel's, which need fonttools, and 3 only mean something on Linux and macOS: SIGTERM, SIGHUP and a folder's mode.
+- In Kali Rolling under WSL 2, with Python 3.14.7, as a normal user, on 2026-11-23: 395 passed, 4 skipped, with the pwn-broker compatibility tests against pwn-broker 0.1.11 and the panel's tests. The 4 that skip only mean something on Windows and macOS: a backslash as a path separator, two names that differ only in case, and two report folder names Windows refuses.
 - Every test blocks the network: `socket`, `http.client` and `urllib` raise if anything reaches them.
 - Only synthetic archives, built in the tests with canary values in every file that must not reach a report: credentials, held-back files, loot, recordings, files the manifest does not list, and extra metadata. Each test that writes a report checks that none of them is in any of its files.
 
@@ -50,7 +50,7 @@ A third review, of the release candidate, found and changed:
 - A `~` in a name could strike text through in `report.md`; it is escaped.
 - A file and a folder of the same name in the copy failed while writing; they stop the build before anything is written, naming both.
 - A report folder name Windows refuses, such as `CON`, was not checked; it is refused by name before anything is made.
-- A link or a duplicated entry inside `lists/`, `tooldata/` or a target's `creds/` was named by the file inside it; it is named by that place.
+- A link or a duplicated entry inside `lists/`, `tooldata/` or a target's `creds/` was named by the file inside it; it is named by that place, however the name spells it.
 - With more than one target, building the model decompressed the archive a third time to read each `target.toml`; it reads them in the checksum pass. Looking up each copied file's SHA-256 walked the whole evidence list, a cost that grew with the square of the number of files; it is one lookup.
 - The release workflow published a tag whose changelog heading still said `(unreleased)`, and the wheel check accepted a member named twice; both are refused. The panel's CI job would have passed had its tests skipped, and the panel script put this checkout's `src/` ahead of an installed pwn-report; the job now fails on a skip, and the script uses `src/` only when nothing is installed.
 - A one-byte file was shown as `1 bytes`.
