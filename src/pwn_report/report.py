@@ -203,8 +203,8 @@ def _listed_path(value, label: str) -> str:
     value = _text(value, label)
     if _leaves_the_box(value) or any(part in {"", "."} for part in value.split("/")):
         # a row in a held-back folder, however spelled, is named by the folder, never the file
-        group = held_back_group("/".join(_spelled(value)))
-        named = f"a path in {group}" if group and group.endswith("/") else repr(value)
+        prefix = _held_back_prefix(value)
+        named = f"a path in {prefix}" if prefix else repr(value)
         raise ReportError(f"manifest.toml lists {named}, which is not a portable relative path inside the box")
     return value
 
@@ -256,25 +256,46 @@ def _member_sha(tar: tarfile.TarFile, member: tarfile.TarInfo, label: str) -> st
     return digest.hexdigest()
 
 
-def _spelled(name: str) -> list[str]:
-    """The parts of the place a name spells: by either slash, with empty and . parts dropped and
-    .. taken back. Only for naming a place in an error; never used as a path."""
-    parts: list[str] = []
-    for part in name.replace("\\", "/").split("/"):
-        if part == "..":
-            if parts:
-                parts.pop()
-        elif part not in {"", "."}:
-            parts.append(part)
-    return parts
+# the parts that name a held-back place: an error never prints what follows one in a name
+_HELD_BACK_PARTS = frozenset({"creds", "creds.toml", "lists", "tooldata"})
+
+
+def _held_back_prefix(name: str) -> str | None:
+    """The name up to its first part that names a held-back place, in any case and by either
+    slash, when anything follows that part; None when none does. Empty and . parts are left out
+    of it. Only for naming a place in an error, so no file inside one is named however its name
+    is spelled; never used as a path."""
+    parts = name.replace("\\", "/").split("/")
+    for index, part in enumerate(parts[:-1]):
+        if part.casefold() in _HELD_BACK_PARTS:
+            return "/".join(kept for kept in parts[: index + 1] if kept not in {"", "."}) + "/"
+    return None
 
 
 def _entry_label(name: str) -> str:
-    """How an error names a member: by its name, or, inside a held-back place, by that place, so no
-    spelling of lists/ or creds/ gets the name of a file inside one printed."""
-    parts = _spelled(name)
-    group = held_back_group("/".join(parts[1:])) if len(parts) > 1 else None
-    return f"in {parts[0]}/{group}" if group else repr(name)
+    """How an error names a member: by its name, or only up to a held-back place in it."""
+    prefix = _held_back_prefix(name)
+    return f"in {prefix}" if prefix else repr(name)
+
+
+def _target(path: str, data: bytes, digest: str, box: dict) -> dict:
+    """The record of one target from its target.toml, already checked against the manifest."""
+    parsed = _toml(data, path)
+    _schema(parsed.get("schema"), f"{path} schema")
+    target = {
+        "box_id": _text(parsed.get("box_id"), f"{path} box_id"),
+        "box": _text(parsed.get("box"), f"{path} box"),
+        "name": _text(parsed.get("name"), f"{path} name"),
+        # kept as recorded: pwn-broker splits what was typed and stores a repeat too
+        "ips": _string_list(parsed.get("ips"), f"{path} ips", unique=False),
+        "hostnames": _string_list(parsed.get("hostnames"), f"{path} hostnames", unique=False),
+        "scope": _text(parsed.get("scope"), f"{path} scope"),
+        "added": _time(parsed.get("added"), f"{path} added").isoformat(),
+        "source": _source(path, digest),
+    }
+    if target["box_id"] != box["id"] or target["box"] != box["name"] or target["name"] != PurePosixPath(path).parts[1]:
+        raise ReportError(f"{path} target identity differs from its box or path")
+    return target
 
 
 def _check_member(member: tarfile.TarInfo) -> None:
@@ -573,17 +594,22 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
             used.add("manifest.toml")
 
         # archive order: a .tar.gz read backwards decompresses again from its start
-        target_bytes: dict[str, bytes] = {}
+        targets = []
         is_target = set(target_paths)
         for path in sorted(used, key=lambda name: member(name).offset_data):
+            target_bytes = None
             if path in is_target:
-                # read here, in archive order: a pass of its own went back to the first target's
-                target_bytes[path] = _member_bytes(tar, member(path), MAX_SMALL_TOML_BYTES, path)
-                hashes[path] = _sha(target_bytes[path])
+                # read in this pass, in archive order, and parsed once checked, keeping only its
+                # record: a pass of its own went back to the first target's, and keeping every
+                # one's bytes to the end cost up to a MiB a target
+                target_bytes = _member_bytes(tar, member(path), MAX_SMALL_TOML_BYTES, path)
+                hashes[path] = _sha(target_bytes)
             elif path not in hashes:
                 hashes[path] = _member_sha(tar, member(path), path)
             if path in records and hashes[path] != records[path]["sha256"]:
                 raise ReportError(f"{path} checksum differs from manifest.toml")
+            if target_bytes is not None:
+                targets.append(_target(path, target_bytes, hashes[path], box))
 
         box_source = _source("box.toml", hashes["box.toml"])
         box_model = {field: value.isoformat() if isinstance(value, datetime) else value for field, value in box.items()}
@@ -606,25 +632,6 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
                 }
             )
 
-        targets = []
-        for path in sorted(target_paths, key=lambda name: member(name).offset_data):
-            data = _toml(target_bytes[path], path)
-            _schema(data.get("schema"), f"{path} schema")
-            expected_name = PurePosixPath(path).parts[1]
-            target = {
-                "box_id": _text(data.get("box_id"), f"{path} box_id"),
-                "box": _text(data.get("box"), f"{path} box"),
-                "name": _text(data.get("name"), f"{path} name"),
-                # kept as recorded: pwn-broker splits what was typed and stores a repeat too
-                "ips": _string_list(data.get("ips"), f"{path} ips", unique=False),
-                "hostnames": _string_list(data.get("hostnames"), f"{path} hostnames", unique=False),
-                "scope": _text(data.get("scope"), f"{path} scope"),
-                "added": _time(data.get("added"), f"{path} added").isoformat(),
-                "source": _source(path, hashes[path]),
-            }
-            if target["box_id"] != box["id"] or target["box"] != box["name"] or target["name"] != expected_name:
-                raise ReportError(f"{path} target identity differs from its box or path")
-            targets.append(target)
         targets.sort(key=lambda target: target["name"])
         if len({target["name"] for target in targets}) != len(targets):
             raise ReportError("target names are duplicated")

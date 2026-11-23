@@ -56,7 +56,8 @@ def problems(wheel: Path, version: str) -> list[str]:
             found.append(f"WHEEL's Tag is {tags}, not ['py3-none-any']")
         if "Root-Is-Purelib: true" not in wheel_file:
             found.append("WHEEL does not say Root-Is-Purelib: true")
-        metadata = text("METADATA").splitlines()
+        # the headers only: the README follows them, after the first blank line, as the description
+        metadata = text("METADATA").split("\n\n", 1)[0].splitlines()
         # standard library only: no dependency every install brings; an extra's (dev) is optional
         for line in metadata:
             if line.startswith("Requires-Dist:") and "extra ==" not in line:

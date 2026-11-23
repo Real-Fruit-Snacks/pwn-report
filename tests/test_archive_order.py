@@ -167,3 +167,31 @@ def test_building_the_model_decompresses_the_archive_twice_at_most(tmp_path, mon
     model = build_model(archive)
     assert [target["name"] for target in model["targets"]] == ["dc01", "web01"]
     assert sum(read) <= 2.2 * size, (sum(read), size)
+
+
+def test_the_target_files_are_not_all_held_in_memory_at_once(tmp_path):
+    # each target.toml may be up to 1 MiB; holding every one's bytes until the end cost a MiB a
+    # target, so a small archive of many padded targets took hundreds of MiB
+    import tracemalloc
+
+    from fixtures import _target_toml, add_members
+
+    base = make_archive(tmp_path / "base.tar.gz", full=True)
+    members = {path: data for path, data in base.members.items() if path != "manifest.toml"}
+    records = list(base.records)
+    padding = b"# " + b"x" * 999_000 + b"\n"
+    for number in range(24):
+        name = f"t{number:02d}"
+        data = _target_toml().replace(b'name = "dc01"', f'name = "{name}"'.encode()) + padding
+        members[f"targets/{name}/target.toml"] = data
+        records.append(file_record(f"targets/{name}/target.toml", data, target=name))
+    members["manifest.toml"] = manifest_bytes(sorted(records, key=lambda r: r.path), kind=base.kind)
+    archive = write_raw_archive(tmp_path / "many.tar.gz", lambda tar: add_members(tar, members))
+    tracemalloc.start()
+    try:
+        model = build_model(archive)
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    assert len(model["targets"]) == 25
+    assert peak < 12_000_000, peak

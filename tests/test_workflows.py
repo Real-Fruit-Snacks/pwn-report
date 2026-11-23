@@ -54,8 +54,9 @@ def _run(tmp_path: Path, script: str, env: dict[str, str]) -> subprocess.Complet
         ("## v0.1.0 (unreleased)", "push", "tag", False),
         ("## v0.1.0", "push", "tag", True),
         ("## v0.1.0 (unreleased)", "workflow_dispatch", "branch", True),
+        ("## v0.1.0 (unreleased)\n\nNotes.\n\n## v0a1b0", "push", "tag", False),
     ],
-    ids=["tag-unreleased", "tag-released", "dry-run-unreleased"],
+    ids=["tag-unreleased", "tag-released", "dry-run-unreleased", "tag-heading-as-a-pattern"],
 )
 def test_a_tag_is_refused_while_the_changelog_says_unreleased(tmp_path, heading, event, ref_type, publishes):
     (tmp_path / "CHANGELOG.md").write_text(f"# Changelog\n\n{heading}\n\nThe first release.\n", encoding="utf-8")

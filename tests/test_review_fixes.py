@@ -450,10 +450,10 @@ def test_a_report_folder_name_windows_refuses_is_refused_by_name(name):
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows refuses these names")
-@pytest.mark.parametrize("name", ["CON", "report."])
+@pytest.mark.parametrize("name", ["CON", "NUL", "report."])
 def test_on_windows_such_a_folder_is_never_made(tmp_path, name):
     fixture = make_archive(tmp_path / "a.tar.gz", full=True)
-    with pytest.raises(ReportError, match="-o"):
+    with pytest.raises(ReportError, match="one Windows refuses or changes; give another with -o"):
         build_report(fixture.path, tmp_path / name)
     assert sorted(p.name for p in tmp_path.iterdir()) == ["a.tar.gz"]
 
@@ -543,6 +543,15 @@ def test_the_report_folder_is_its_owners_alone(tmp_path):
         "{box}/scans/../lists/SECRET-INNER-NAME",
         "{box}/targets/dc01//creds/SECRET-INNER-NAME",
         "{box}\\tooldata\\SECRET-INNER-NAME",
+        "{box}/lists/SECRET-INNER-NAME/..",
+        "{box}/lists/SECRET-INNER-NAME/../../../x",
+        "{box}/targets/dc01/creds/SECRET-INNER-NAME/..",
+        "C:/{box}/lists/SECRET-INNER-NAME",
+        "C:\\{box}\\lists\\SECRET-INNER-NAME",
+        "{box}/targets/a:b/creds/SECRET-INNER-NAME",
+        "{box}/LISTS/SECRET-INNER-NAME",
+        "{box}/creds.toml/SECRET-INNER-NAME",
+        "lists/SECRET-INNER-NAME",
     ],
 )
 def test_an_odd_spelling_of_a_held_back_place_is_still_named_by_the_place(tmp_path, spelled):
@@ -565,7 +574,7 @@ def test_an_odd_spelling_of_a_held_back_place_is_still_named_by_the_place(tmp_pa
         build_model(bad)
     message = str(raised.value)
     assert "SECRET-INNER-NAME" not in message, message
-    assert any(place in message for place in ("lists/", "tooldata/", "targets/dc01/creds/")), message
+    assert any(place in message.casefold() for place in ("lists/", "tooldata/", "creds/", "creds.toml/")), message
 
 
 def _sentinel(signum, frame) -> None:
@@ -703,6 +712,8 @@ def test_a_stop_just_after_the_rename_still_reports_the_report(tmp_path, capsys,
         "lists/../lists/SECRET-INNER-NAME",
         "targets/dc01/creds//SECRET-INNER-NAME",
         "tooldata/../tooldata/SECRET-INNER-NAME",
+        "lists/SECRET-INNER-NAME/..",
+        "/lists/SECRET-INNER-NAME",
     ],
 )
 def test_a_refused_manifest_row_in_a_held_back_place_is_named_by_the_place(tmp_path, row):

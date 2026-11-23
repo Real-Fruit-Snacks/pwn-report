@@ -93,3 +93,12 @@ def test_check_wheel_refuses_a_member_named_twice(tmp_path):
 def test_check_wheel_accepts_a_dependency_only_an_extra_brings(tmp_path):
     path = _wheel(tmp_path, requires="Requires-Dist: pytest>=8; extra == 'dev'\n")
     assert check_wheel.problems(path, VERSION) == []
+
+
+def test_check_wheel_reads_metadata_headers_not_the_readme_after_them(tmp_path):
+    readme = "Description-Content-Type: text/markdown\n\n# pwn-report\n\nRequires-Dist: prose in the README\n"
+    assert check_wheel.problems(_wheel(tmp_path, requires=readme), VERSION) == []
+    (tmp_path / "other").mkdir()
+    wrong = _wheel(tmp_path / "other", version="9.9.9", requires="\nVersion: 0.1.0\n")
+    found = check_wheel.problems(wrong, VERSION)
+    assert any("Version: 9.9.9" in problem for problem in found), found

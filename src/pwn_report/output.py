@@ -375,13 +375,14 @@ def _validate_staging(
 
 
 def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
+    # first: on Windows NUL and CON exist in every folder, so they would read as an existing output
+    problem = _unwritable_output(output.name, windows=os.name == "nt")
+    if problem is not None:
+        raise ReportError(problem)
     if os.path.lexists(output):
         raise ReportError(f"output already exists and will not be replaced: {output}")
     if not output.parent.is_dir():
         raise ReportError(f"output parent is not an existing directory: {output.parent}")
-    problem = _unwritable_output(output.name, windows=os.name == "nt")
-    if problem is not None:
-        raise ReportError(problem)
 
     model = validate_model(build_model(archive, selection))
     # each copied file's SHA-256 by its path, made once: a walk of all the evidence per file
