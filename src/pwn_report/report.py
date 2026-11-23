@@ -333,10 +333,10 @@ def _event_key(event: dict) -> tuple:
     return (instant, event["at"], event["kind"], _compact_json(event))
 
 
-def _string_list(value, label: str) -> list[str]:
+def _string_list(value, label: str, *, unique: bool = True) -> list[str]:
     if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
         raise ReportError(f"{label} must be a list of strings")
-    if len(set(value)) != len(value):
+    if unique and len(set(value)) != len(value):
         raise ReportError(f"{label} contains duplicates")
     return list(value)
 
@@ -530,8 +530,9 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
                 "box_id": _text(data.get("box_id"), f"{path} box_id"),
                 "box": _text(data.get("box"), f"{path} box"),
                 "name": _text(data.get("name"), f"{path} name"),
-                "ips": _string_list(data.get("ips"), f"{path} ips"),
-                "hostnames": _string_list(data.get("hostnames"), f"{path} hostnames"),
+                # kept as recorded: pwn-broker splits what was typed and stores a repeat too
+                "ips": _string_list(data.get("ips"), f"{path} ips", unique=False),
+                "hostnames": _string_list(data.get("hostnames"), f"{path} hostnames", unique=False),
                 "scope": _text(data.get("scope"), f"{path} scope"),
                 "added": _time(data.get("added"), f"{path} added").isoformat(),
                 "source": _source(path, hashes[path]),

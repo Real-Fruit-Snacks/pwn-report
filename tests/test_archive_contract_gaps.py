@@ -101,7 +101,8 @@ def test_r08_listed_directory_row_is_rejected(tmp_path):
 
 
 @pytest.mark.parametrize("field", ["ips", "hostnames"])
-def test_r11_nonunique_target_addresses_are_rejected(tmp_path, field):
+def test_r11_repeated_target_addresses_are_kept_as_recorded(tmp_path, field):
+    # pwn-broker splits what was typed on spaces and keeps it, so "10.10.10.161 10.10.10.161" is stored twice
     fixture = make_archive(tmp_path / "source" / "forest.tar.gz", full=True)
     members = dict(fixture.members)
     old = b'["10.10.10.161"]' if field == "ips" else b'["forest.htb.local"]'
@@ -115,7 +116,9 @@ def test_r11_nonunique_target_addresses_are_rejected(tmp_path, field):
     ]
     members["manifest.toml"] = manifest_bytes(records, kind=fixture.kind)
     archive = write_archive(tmp_path / f"duplicate-{field}.tar.gz", members)
-    _reject_atomically(archive, tmp_path, "contains duplicates")
+    model = build_report(archive, tmp_path / "out")
+    expected = ["10.10.10.161", "10.10.10.161"] if field == "ips" else ["forest.htb.local", "forest.htb.local"]
+    assert model["targets"][0][field] == expected
 
 
 @pytest.mark.parametrize("root", ["C:", "bad\\root", "bad\nroot"], ids=["drive", "backslash", "control"])

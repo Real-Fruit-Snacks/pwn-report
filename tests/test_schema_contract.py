@@ -107,8 +107,6 @@ def test_top_level_box_and_provenance_schema_mutations(tmp_path, path, value):
         ("box_id", "different-box"),
         ("box", "different-name"),
         ("name", ""),
-        ("ips", ["10.10.10.161", "10.10.10.161"]),
-        ("hostnames", ["forest.htb.local", "forest.htb.local"]),
         ("ips", "10.10.10.161"),
         ("scope", ""),
         ("added", "2026-11-14"),
