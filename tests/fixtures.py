@@ -22,6 +22,8 @@ FIRST_SEEN = datetime(2026, 11, 14, 12, 15, 0, tzinfo=timezone(timedelta(hours=2
 LATER = datetime(2026, 11, 14, 12, 30, 0, tzinfo=timezone(timedelta(hours=2)))
 PACKED = datetime(2026, 11, 14, 13, 0, 0, tzinfo=timezone(timedelta(hours=2)))
 EVIDENCE_KINDS = frozenset({"scans", "loot", "screenshots", "recordings", "exploits"})
+# indexed only inside a target, and copied only when a selection includes them
+TARGET_ONLY_KINDS = frozenset({"files", "upload"})
 
 NOTES = (
     "# Forest notes\n\nPrivate NOTE-CANARY; {{7*7}} stays data.\n\n"
@@ -31,6 +33,13 @@ POC = b'raise RuntimeError("ARCHIVE_CODE_EXECUTED")\n'
 UNLISTED_CANARY = b"UNLISTED-CONTENT-CANARY"
 CREDS_CANARY = b"CRED-ROOT-CANARY"
 LISTS_CANARY = b"LIST-CONTENT-CANARY"
+CREDS_FOLDER_CANARY = b"CREDS-FOLDER-CANARY"
+TOOLDATA_CANARY = b"TOOLDATA-CANARY"
+FILES_CANARY = b"FILES-FOLDER-CANARY"
+UPLOAD_CANARY = b"UPLOAD-FOLDER-CANARY"
+STRAY_CANARY = b"STRAY-FILE-CANARY"
+# held back like creds.toml: never read, never copied, never selectable; only counted
+HELD_BACK = ("creds.toml", "lists/", "targets/dc01/creds/", "tooldata/")
 # the box fields make_archive can override, as pwn-broker writes them by default
 BOX_FIELDS = {"name": "forest", "platform": "htb", "os": "windows", "difficulty": "easy"}
 
@@ -226,7 +235,7 @@ def _manifest_toml(
 
 def _evidence_location(path: str) -> tuple[str, str] | None:
     parts = PurePosixPath(path).parts
-    if len(parts) >= 4 and parts[0] == "targets" and parts[2] in EVIDENCE_KINDS:
+    if len(parts) >= 4 and parts[0] == "targets" and parts[2] in EVIDENCE_KINDS | TARGET_ONLY_KINDS:
         return parts[1], parts[2]
     if len(parts) >= 2 and parts[0] in EVIDENCE_KINDS:
         return "", parts[0]
@@ -239,6 +248,43 @@ def _source(members: dict[str, bytes], path: str) -> dict[str, str]:
 
 def _compact_json(value: dict) -> bytes:
     return json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def _held_back_group(path: str) -> str | None:
+    parts = PurePosixPath(path).parts
+    if path == "creds.toml":
+        return "creds.toml"
+    if parts[0] in {"lists", "tooldata"} and len(parts) >= 2:
+        return parts[0] + "/"
+    if len(parts) >= 4 and parts[0] == "targets" and parts[2] == "creds":
+        return f"targets/{parts[1]}/creds/"
+    return None
+
+
+def _held_back(records: list[FileRecord]) -> list[dict]:
+    counts: dict[str, int] = {}
+    for record in records:
+        group = _held_back_group(record.path)
+        if group is not None:
+            counts[group] = counts.get(group, 0) + 1
+    return [{"path": path, "files": counts[path]} for path in sorted(counts)]
+
+
+def _is_metadata(path: str) -> bool:
+    parts = PurePosixPath(path).parts
+    return path in {"box.toml", "notes.md", "manifest.toml"} or (
+        len(parts) == 3 and parts[0] == "targets" and parts[2] == "target.toml"
+    )
+
+
+def _other(records: list[FileRecord]) -> list[str]:
+    return sorted(
+        record.path
+        for record in records
+        if _evidence_location(record.path) is None
+        and _held_back_group(record.path) is None
+        and not _is_metadata(record.path)
+    )
 
 
 def _expected_model(
@@ -305,6 +351,8 @@ def _expected_model(
         reason = "default-include" if copied else {
             "loot": "default-exclude-loot",
             "recordings": "default-exclude-recording",
+            "files": "default-exclude-files",
+            "upload": "default-exclude-upload",
         }[evidence_kind]
         output = {"copied": copied, "reason": reason}
         if copied:
@@ -380,6 +428,8 @@ def _expected_model(
         "timeline": timeline,
         "evidence": evidence,
         "findings": [],
+        "held_back": _held_back(records),
+        "other": _other(records),
     }
     if full:
         model["notes"] = {
@@ -448,6 +498,14 @@ def make_archive(
                 "targets/dc01/loot/SAM.bak": b"LOOT-CONTENT-CANARY",
                 "targets/dc01/recordings/session.cast": b"RECORDING-CONTENT-CANARY",
                 "screenshots/root.png": b"\x89PNG\r\n\x1a\nROOT-SCREENSHOT",
+                # listed, as real pwn-broker lists them
+                "creds.toml": CREDS_CANARY,
+                "lists/passwords.txt": LISTS_CANARY,
+                "targets/dc01/creds/admin.ccache": CREDS_FOLDER_CANARY,
+                "tooldata/netexec/nxc.db": TOOLDATA_CANARY,
+                "targets/dc01/files/notes.txt": FILES_CANARY,
+                "targets/dc01/upload/winpeas.exe": UPLOAD_CANARY,
+                "stray.txt": STRAY_CANARY,
             }
         )
 
@@ -459,14 +517,8 @@ def make_archive(
         records.append(file_record(path, members[path], target=target, first_seen=first_seen))
 
     if full:
-        # These exercise the unlisted/private boundary without entering records.
-        members.update(
-            {
-                "unlisted.txt": UNLISTED_CANARY,
-                "creds.toml": CREDS_CANARY,
-                "lists/passwords.txt": LISTS_CANARY,
-            }
-        )
+        # This exercises the unlisted boundary without entering records.
+        members["unlisted.txt"] = UNLISTED_CANARY
     members["manifest.toml"] = manifest_bytes(records, kind=kind, finished=finished, box=box)
     write_archive(destination, members)
 

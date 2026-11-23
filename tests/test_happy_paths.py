@@ -108,6 +108,8 @@ def test_h01_minimal_exported_fixture_and_golden_model(tmp_path):
         "timeline": [],
         "evidence": [],
         "findings": [],
+        "held_back": [],
+        "other": [],
     }
     assert "finished" not in first.model["box"]
     assert "notes" not in first.model
@@ -131,8 +133,9 @@ def test_h02_full_exported_fixture_and_golden_model(tmp_path):
 
     manifest = tomllib.loads(first.manifest_bytes.decode("utf-8"))
     listed = {row["path"] for row in manifest["file"]}
-    assert listed == set(first.members) - {"manifest.toml", "unlisted.txt", "creds.toml", "lists/passwords.txt"}
-    assert len(first.records) == 9
+    # as real pwn-broker does, the manifest lists creds.toml and lists/; they are held back, not unlisted
+    assert listed == set(first.members) - {"manifest.toml", "unlisted.txt"}
+    assert len(first.records) == 16
     assert all(set(row) == {"path", "target", "first_seen", "size", "mtime", "sha256"} for row in manifest["file"])
 
     model = first.model
@@ -180,10 +183,12 @@ def test_h02_full_exported_fixture_and_golden_model(tmp_path):
     policies = {
         "screenshots/root.png": ("screenshots", "", True, "default-include"),
         "targets/dc01/exploits/poc.py": ("exploits", "dc01", True, "default-include"),
+        "targets/dc01/files/notes.txt": ("files", "dc01", False, "default-exclude-files"),
         "targets/dc01/loot/SAM.bak": ("loot", "dc01", False, "default-exclude-loot"),
         "targets/dc01/recordings/session.cast": ("recordings", "dc01", False, "default-exclude-recording"),
         "targets/dc01/scans/nmap.txt": ("scans", "dc01", True, "default-include"),
         "targets/dc01/screenshots/proof.png": ("screenshots", "dc01", True, "default-include"),
+        "targets/dc01/upload/winpeas.exe": ("upload", "dc01", False, "default-exclude-upload"),
     }
     assert [item["path"] for item in model["evidence"]] == sorted(policies)
 
@@ -240,7 +245,14 @@ def test_h02_full_exported_fixture_and_golden_model(tmp_path):
     )
     expected_events.sort(key=_event_key)
     assert model["timeline"] == expected_events
-    assert len(model["timeline"]) == 9
+    assert len(model["timeline"]) == 11
+    assert model["held_back"] == [
+        {"path": "creds.toml", "files": 1},
+        {"path": "lists/", "files": 1},
+        {"path": "targets/dc01/creds/", "files": 1},
+        {"path": "tooldata/", "files": 1},
+    ]
+    assert model["other"] == ["stray.txt"]
     assert {event["kind"] for event in model["timeline"]} == {"target_added", "flag_recorded", "file_first_seen"}
 
     encoded = canonical_json(model)

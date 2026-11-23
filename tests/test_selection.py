@@ -200,7 +200,7 @@ def test_selection_rejects_deferred_or_fact_overriding_fields(tmp_path, location
 
 def test_unknown_evidence_fails_before_archived_content_hashing(tmp_path, monkeypatch):
     fixture = make_archive(tmp_path / "source" / "forest.tar.gz", full=True)
-    selection = _selection(tmp_path, "schema = 1\n[[rule]]\npath = 'creds.toml'\n")
+    selection = _selection(tmp_path, "schema = 1\n[[rule]]\npath = 'unlisted.txt'\n")
 
     def unexpected_hash(*args):
         raise AssertionError("archived content was hashed before selection validation")

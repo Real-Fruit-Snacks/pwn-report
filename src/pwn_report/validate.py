@@ -7,7 +7,10 @@ import math
 import re
 from datetime import datetime
 
-from .report import EVIDENCE_KINDS, MAY_BE_EMPTY, ReportError, _event_key, _evidence_location
+from .report import (
+    ALL_KINDS, DEFAULT_OMITTED, MAY_BE_EMPTY, METADATA, ReportError, _event_key, _evidence_location,
+    held_back_group, is_target_toml,
+)  # fmt: skip
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _EVIDENCE_ID = re.compile(r"^ev_[0-9a-f]{64}$")
@@ -15,6 +18,7 @@ _DATETIME = re.compile(
     r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?(?:Z|[+-][0-9]{2}:[0-9]{2})$"
 )
 _MISSING = object()
+_HELD_BACK_PATH = re.compile(r"^(?:creds\.toml|lists/|tooldata/|targets/[^/]+/creds/)$")
 
 
 def _fail(label: str, message: str) -> None:
@@ -128,7 +132,10 @@ def validate_model(model: dict) -> dict:
     _object(
         model,
         "model",
-        {"schema_version", "profile", "status", "box", "source", "flags", "targets", "timeline", "evidence", "findings"},
+        {
+            "schema_version", "profile", "status", "box", "source", "flags", "targets", "timeline",
+            "evidence", "findings", "held_back", "other",
+        },  # fmt: skip
         {"notes"},
     )
     if _integer(model["schema_version"], "model.schema_version") != 1:
@@ -235,7 +242,7 @@ def validate_model(model: dict) -> dict:
         if identifier != _evidence_id(box["id"], path, digest):
             _fail(f"{label}.id", "does not match its box, path, and content hash")
         location = _evidence_location(path)
-        if location is None or location[1] not in EVIDENCE_KINDS:
+        if location is None or location[1] not in ALL_KINDS:
             _fail(f"{label}.path", "is not a supported evidence path")
         expected_target, expected_kind = location
         if item["kind"] != expected_kind or not isinstance(item["kind"], str):
@@ -278,7 +285,7 @@ def validate_model(model: dict) -> dict:
                 _fail(f"{label}.output.path", "is duplicated")
             output_paths.add(output["path"])
         else:
-            if reason not in {"default-exclude-loot", "default-exclude-recording", "selection-exclude"}:
+            if reason not in {*DEFAULT_OMITTED.values(), "selection-exclude"}:
                 _fail(f"{label}.output.reason", "is invalid for omitted evidence")
             if "path" in output:
                 _fail(f"{label}.output.path", "must be absent for omitted evidence")
@@ -339,6 +346,34 @@ def validate_model(model: dict) -> dict:
             _fail(f"{label}.{reference_field}", "is a dangling reference")
     if timeline != expected_timeline:
         _fail("model.timeline", "must contain exactly the canonically ordered source events")
+
+    held_back = model["held_back"]
+    if not isinstance(held_back, list):
+        _fail("model.held_back", "must be an array")
+    for index, group in enumerate(held_back):
+        label = f"model.held_back[{index}]"
+        _object(group, label, {"path", "files"})
+        path = _string(group["path"], f"{label}.path")
+        if not _HELD_BACK_PATH.fullmatch(path):
+            _fail(f"{label}.path", "is not a held-back location")
+        # the shape is right; the target name in targets/<t>/creds/ must also be portable
+        _path(path.rstrip("/"), f"{label}.path")
+        _integer(group["files"], f"{label}.files", minimum=1)
+    paths = [group["path"] for group in held_back]
+    if paths != sorted(set(paths)):
+        _fail("model.held_back", "must be sorted by path without duplicates")
+    other = _strings(model["other"], "model.other", nonempty=True)
+    for index, path in enumerate(other):
+        _path(path, f"model.other[{index}]")
+        if (
+            _evidence_location(path) is not None
+            or held_back_group(path) is not None
+            or path in METADATA
+            or is_target_toml(path)
+        ):
+            _fail(f"model.other[{index}]", "is evidence, held back or metadata, not other")
+    if other != sorted(other):
+        _fail("model.other", "must be sorted")
 
     if not isinstance(model["findings"], list) or model["findings"]:
         _fail("model.findings", "must be an empty array in schema version 1")

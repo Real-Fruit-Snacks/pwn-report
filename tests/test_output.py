@@ -152,7 +152,8 @@ def test_h06_h08_a01_a02_selected_output_notes_links_and_checksums(tmp_path):
     assert metadata_bytes.endswith(b"\n") and b"\r" not in metadata_bytes
     assert files["report.md"].endswith(b"\n") and b"\r" not in files["report.md"]
 
-    forbidden = (CREDS_CANARY, LISTS_CANARY, UNLISTED_CANARY, b"lists/passwords.txt", b"creds.toml", b"unlisted.txt")
+    # held-back locations are named with their counts; their contents and the files inside never appear
+    forbidden = (CREDS_CANARY, LISTS_CANARY, UNLISTED_CANARY, b"lists/passwords.txt", b"unlisted.txt")
     for relative, data in files.items():
         for canary in forbidden:
             assert canary not in data, (relative, canary)

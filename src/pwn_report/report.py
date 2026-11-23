@@ -29,6 +29,21 @@ ENTRY_HEADER_BYTES = 16 * 1024
 HEADER_ROOM = 2048
 HEADER_LINES = 16
 EVIDENCE_KINDS = frozenset({"scans", "loot", "screenshots", "recordings", "exploits"})
+# indexed only inside a target, and copied only when a selection includes them
+TARGET_ONLY_KINDS = frozenset({"files", "upload"})
+ALL_KINDS = EVIDENCE_KINDS | TARGET_ONLY_KINDS
+COPIED_BY_DEFAULT = frozenset({"scans", "screenshots", "exploits"})
+DEFAULT_OMITTED = {
+    "loot": "default-exclude-loot",
+    "recordings": "default-exclude-recording",
+    "files": "default-exclude-files",
+    "upload": "default-exclude-upload",
+}
+# the box's own files, read for the report itself rather than indexed
+METADATA = frozenset({"box.toml", "notes.md", "manifest.toml"})
+HELD_BACK_MESSAGE = (
+    "creds.toml, lists/, targets/*/creds/ and tooldata/ hold credential material and are never read"
+)
 # pwn-broker stores a new box's os and difficulty as typed, so pressing Enter leaves them empty
 MAY_BE_EMPTY = frozenset({"os", "difficulty"})
 
@@ -272,9 +287,26 @@ def _record(row, label: str) -> dict:
     }
 
 
+def held_back_group(path: str) -> str | None:
+    """The held-back location a path is in: creds.toml, lists/, targets/<t>/creds/ or tooldata/."""
+    parts = PurePosixPath(path).parts
+    if path == "creds.toml":
+        return "creds.toml"
+    if len(parts) >= 2 and parts[0] in {"lists", "tooldata"}:
+        return parts[0] + "/"
+    if len(parts) >= 4 and parts[0] == "targets" and parts[2] == "creds":
+        return f"targets/{parts[1]}/creds/"
+    return None
+
+
+def is_target_toml(path: str) -> bool:
+    parts = PurePosixPath(path).parts
+    return len(parts) == 3 and parts[0] == "targets" and parts[2] == "target.toml"
+
+
 def _evidence_location(path: str) -> tuple[str, str] | None:
     parts = PurePosixPath(path).parts
-    if len(parts) >= 4 and parts[0] == "targets" and parts[2] in EVIDENCE_KINDS:
+    if len(parts) >= 4 and parts[0] == "targets" and parts[2] in ALL_KINDS:
         return parts[1], parts[2]
     if len(parts) >= 2 and parts[0] in EVIDENCE_KINDS:
         return "", parts[0]
@@ -425,13 +457,21 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
         used = {"box.toml"}
         target_paths = []
         evidence_rows = []
+        held_counts: dict[str, int] = {}
+        other = []
+        # every listed file is one of: held back, a target's target.toml, evidence, metadata, other
         for path, record in records.items():
-            parts = PurePosixPath(path).parts
-            if len(parts) == 3 and parts[0] == "targets" and parts[2] == "target.toml":
-                if record["target"] != parts[1]:
+            group = held_back_group(path)
+            if group is not None:
+                # counted from the manifest alone: never hashed, read or copied
+                held_counts[group] = held_counts.get(group, 0) + 1
+                continue
+            if is_target_toml(path):
+                if record["target"] != PurePosixPath(path).parts[1]:
                     raise ReportError(f"{path} target differs from its path")
                 target_paths.append(path)
                 used.add(path)
+                continue
             location = _evidence_location(path)
             if location is not None:
                 target, _ = location
@@ -439,8 +479,12 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
                     raise ReportError(f"{path} target differs from its path")
                 evidence_rows.append((path, record, location))
                 used.add(path)
+            elif path not in METADATA:
+                other.append(path)
         evidence_paths = {path for path, _, _ in evidence_rows}
         for path in selection_rules:
+            if held_back_group(path) is not None:
+                raise ReportError(f"selection names {path}, which is held back: {HELD_BACK_MESSAGE}")
             if path not in evidence_paths:
                 raise ReportError(f"selection references unknown, unlisted, or unsupported evidence: {path}")
         if "notes.md" in records:
@@ -511,11 +555,8 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
                 copied = rule["include"]
                 reason = "selection-include" if copied else "selection-exclude"
             else:
-                copied = evidence_kind in {"scans", "screenshots", "exploits"}
-                reason = "default-include" if copied else {
-                    "loot": "default-exclude-loot",
-                    "recordings": "default-exclude-recording",
-                }[evidence_kind]
+                copied = evidence_kind in COPIED_BY_DEFAULT
+                reason = "default-include" if copied else DEFAULT_OMITTED[evidence_kind]
             output = {"copied": copied, "reason": reason}
             if copied:
                 output["path"] = "evidence/" + path
@@ -571,6 +612,8 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
             "timeline": timeline,
             "evidence": evidence,
             "findings": [],
+            "held_back": [{"path": group, "files": held_counts[group]} for group in sorted(held_counts)],
+            "other": sorted(other),
         }
         if "notes.md" in records:
             model["notes"] = {

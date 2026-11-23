@@ -17,6 +17,11 @@ from .report import READ_BYTES, ReportError, _file_sha, _members, _open, build_m
 from .validate import validate_model
 
 GENERATOR_VERSION = __version__
+# what the report never reads, and what it keeps as it was; the README quotes it word for word
+PRIVACY_NOTE = (
+    "It never reads `creds.toml`, `lists/`, `targets/*/creds/` or `tooldata/`. "
+    "`notes.md` and copied scans are as they were and can hold passwords; keep this report private."
+)
 _LINK = re.compile(r"(?<!\\)\[[^\]\n]*(?<!\\)\]\(([^)\s]+)\)")
 _CHECKSUM_ROW = re.compile(r"^([0-9a-f]{64})  (.+)$")
 
@@ -70,6 +75,8 @@ def _render_markdown(model: dict) -> bytes:
         "## Review status",
         "",
         "**Draft / unreviewed.** No publication approval, severity rating, or finding validity is implied.",
+        "",
+        PRIVACY_NOTE,
         "",
         "## Box summary",
         "",
@@ -150,6 +157,24 @@ def _render_markdown(model: dict) -> bytes:
             if "alt_text" in item:
                 lines.append(f"- Alt text: {_md_text(item['alt_text'])}")
             lines.append("")
+    if lines[-1] != "":
+        lines.append("")
+    lines.extend(("## Not in the index", ""))
+    if not model["held_back"] and not model["other"]:
+        lines.extend(("No files are held back or outside the index.", ""))
+    if model["held_back"]:
+        lines.extend(("Held back, never read or copied:", ""))
+        for group in model["held_back"]:
+            count = group["files"]
+            if group["path"].endswith("/"):
+                lines.append(f"- {_md_text(group['path'])}: {count} file{'' if count == 1 else 's'}, held back")
+            else:
+                lines.append(f"- {_md_text(group['path'])}: held back")
+        lines.append("")
+    if model["other"]:
+        lines.extend(("Listed in the archive, outside the index:", ""))
+        lines.extend(f"- {_md_text(path)}" for path in model["other"])
+        lines.append("")
     lines.extend(("## Notes", ""))
     if "notes" in model:
         lines.append(f"[Open archived notes]({_md_link(model['notes']['report_path'])})")

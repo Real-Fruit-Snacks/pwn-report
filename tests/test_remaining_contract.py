@@ -12,7 +12,7 @@ from pwn_report import report as report_module
 from fixtures import BOX_ID, file_record, make_archive, manifest_bytes, write_archive
 
 
-def test_listed_files_and_upload_folders_are_ignored_and_never_opened(tmp_path, monkeypatch):
+def test_target_files_are_indexed_and_a_root_upload_folder_is_other_and_never_opened(tmp_path, monkeypatch):
     fixture = make_archive(tmp_path / "source" / "forest.tar.gz", full=True)
     members = dict(fixture.members)
     additions = {
@@ -40,9 +40,12 @@ def test_listed_files_and_upload_folders_are_ignored_and_never_opened(tmp_path, 
     monkeypatch.setattr(tarfile.TarFile, "extractfile", observed)
     destination = tmp_path / "report"
     model = build_report(archive, destination)
-    paths = {item["path"] for item in model["evidence"]}
-    assert not any("/files/" in path or path.startswith("upload/") for path in paths)
-    assert not any("/files/" in name or name.endswith("/upload/root.txt") for name in opened)
+    rows = {item["path"]: item for item in model["evidence"]}
+    # inside a target, files/ is indexed, so it is read to check its checksum, but not copied
+    assert rows["targets/dc01/files/private.txt"]["output"] == {"copied": False, "reason": "default-exclude-files"}
+    # pwn-broker makes upload/ only inside a target: one at the box root is listed as other, unread
+    assert "upload/root.txt" not in rows and "upload/root.txt" in model["other"]
+    assert not any(name.endswith("/upload/root.txt") for name in opened)
     for output in destination.rglob("*"):
         if output.is_file():
             data = output.read_bytes()
