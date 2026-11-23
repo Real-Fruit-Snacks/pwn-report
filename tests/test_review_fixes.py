@@ -554,6 +554,8 @@ def test_the_report_folder_is_its_owners_alone(tmp_path):
         "lists/SECRET-INNER-NAME",
         "C:lists/SECRET-INNER-NAME",
         "C:tooldata\\SECRET-INNER-NAME",
+        "{box}/lists:SECRET-INNER-NAME/x",
+        "{box}/creds.toml:SECRET-INNER-NAME",
     ],
 )
 def test_an_odd_spelling_of_a_held_back_place_is_still_named_by_the_place(tmp_path, spelled):
@@ -722,6 +724,9 @@ def test_a_stop_just_after_the_rename_still_reports_the_report(tmp_path, capsys,
         "LISTS/SECRET-INNER-NAME",
         "creds.toml/SECRET-INNER-NAME",
         "targets/dc01/creds\\SECRET-INNER-NAME",
+        "lists:SECRET-INNER-NAME/x",
+        "C:lists:SECRET-INNER-NAME/x",
+        "creds.toml:SECRET-INNER-NAME",
     ],
 )
 def test_a_refused_manifest_row_in_a_held_back_place_is_named_by_the_place(tmp_path, row):
@@ -922,3 +927,58 @@ def test_a_handler_python_cannot_put_back_is_left_alone(tmp_path, monkeypatch, o
     monkeypatch.setattr(cli.signal, "signal", setting)
     assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 0
     assert signal.SIGTERM not in touched and signal.SIGINT in touched
+
+
+@pytest.mark.parametrize("removable", [True, False], ids=["removed", "left"])
+def test_a_folder_another_program_makes_at_the_output_is_not_taken_for_the_report(
+    tmp_path, capsys, monkeypatch, removable
+):
+    # the build is stopped after something else made an empty folder where the report would go:
+    # that folder is not the report, and a staging copy left behind is still named
+    import shutil
+
+    from pwn_report import output
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+
+    def stopped(*args, **kwargs):
+        (tmp_path / "out").mkdir()
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(output, "_validate_staging", stopped)
+    if not removable:
+        monkeypatch.setattr(output.shutil, "rmtree", lambda *args, **kwargs: None)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    if removable:
+        assert captured.err == "fail  interrupted; no report was written\n"
+    else:
+        assert captured.err.startswith("fail  interrupted; a partial copy was left at "), captured.err
+        monkeypatch.undo()
+        for left in tmp_path.glob(".out.tmp-*"):
+            shutil.rmtree(left)
+
+
+def test_a_stop_while_a_failed_build_is_cleaned_up_names_a_copy_it_cannot_remove(tmp_path, capsys, monkeypatch):
+    import shutil
+    import signal
+
+    from pwn_report import output
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+
+    def failed(*args, **kwargs):
+        raise ReportError("staged asset evidence/x has the wrong checksum")
+
+    def rmtree(*args, **kwargs):
+        signal.raise_signal(signal.SIGINT)  # the first stop lands, and the folder cannot be removed
+
+    monkeypatch.setattr(output, "_validate_staging", failed)
+    monkeypatch.setattr(output.shutil, "rmtree", rmtree)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
+    err = capsys.readouterr().err
+    assert err.startswith("fail  interrupted; a partial copy was left at ") and err.count("\n") == 1, err
+    monkeypatch.undo()
+    for left in tmp_path.glob(".out.tmp-*"):
+        shutil.rmtree(left)

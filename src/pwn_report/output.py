@@ -483,13 +483,14 @@ def _remove_stage(stage: Path) -> bool:
     command ignores every stop after its first, so the next run finishes), and then the stop goes
     on, naming the folder if any of it is left."""
     stopped = None
+    left = True  # unless a removal is seen through to its end, the folder is named
     for _attempt in range(3):
         try:
             shutil.rmtree(stage, ignore_errors=True)
+            left = os.path.lexists(stage)
             break
         except KeyboardInterrupt as exc:
             stopped = exc
-    left = os.path.lexists(stage)
     if stopped is not None:
         if left:
             raise Interrupted(stage) from stopped

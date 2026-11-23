@@ -269,10 +269,17 @@ def _held_back_prefix(name: str) -> str | None:
     of it. Only for naming a place in an error, so no file inside one is named however its name
     is spelled; never used as a path."""
     parts = name.replace("\\", "/").split("/")
-    for index, part in enumerate(parts[:-1]):
-        # a drive letter, or a stream name, can be glued on with a colon: C:lists
-        if any(piece.casefold() in _HELD_BACK_PARTS for piece in part.split(":")):
-            return "/".join(kept for kept in parts[: index + 1] if kept not in {"", "."}) + "/"
+    for index, part in enumerate(parts):
+        # a drive letter before, or a stream name after, can be glued on with a colon:
+        # C:lists, lists:x; the name is cut after the held-back piece itself
+        pieces = part.split(":")
+        for at, piece in enumerate(pieces):
+            if piece.casefold() not in _HELD_BACK_PARTS:
+                continue
+            if at == len(pieces) - 1 and index == len(parts) - 1:
+                return None  # the place itself, with nothing inside it to hide
+            kept = [kept for kept in parts[:index] if kept not in {"", "."}]
+            return "/".join([*kept, ":".join(pieces[: at + 1])]) + "/"
     return None
 
 

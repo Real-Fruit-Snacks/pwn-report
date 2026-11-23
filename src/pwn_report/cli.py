@@ -74,8 +74,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.select is not None and not args.select.is_file():
         return _fail(f"no selection file at {args.select}")
     output = args.output if args.output is not None else default_output(archive)
-    # build_report never replaces a folder: if none is here now and one is after a stop, it is the
-    # report, renamed into place whole
+    # build_report never replaces a folder: if none is here now and a report is after a stop, it
+    # was renamed into place whole
     existed = os.path.lexists(output)
     previous: dict = {}
     try:
@@ -88,9 +88,9 @@ def main(argv: list[str] | None = None) -> int:
             # one that raises out of main with a traceback
             _put_back(previous)
     except KeyboardInterrupt as exc:
-        if existed or not os.path.isdir(output):
+        left = getattr(exc, "left", None)
+        if left is not None or existed or not _is_report(output):
             # build_report removes its staging folder on the way out; one it could not remove is named
-            left = getattr(exc, "left", None)
             if left is not None:
                 _say(f"fail  interrupted; a partial copy was left at {left}: delete it, it holds copied evidence", sys.stderr)
             else:
@@ -104,6 +104,11 @@ def main(argv: list[str] | None = None) -> int:
         return _fail(f"unexpected error: {type(exc).__name__}: {exc}")
     _say(f"ok    report {output}", sys.stdout)
     return 0
+
+
+def _is_report(output: Path) -> bool:
+    """A report folder renamed into place: one with the files only a whole report has."""
+    return output.is_dir() and (output / "SHA256SUMS").is_file() and (output / "report.toml").is_file()
 
 
 def _stop_on_signals(previous: dict) -> None:
