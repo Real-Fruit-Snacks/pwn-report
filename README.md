@@ -59,7 +59,7 @@ Success is that one line and exit status 0. Anything else is one `fail` line and
 
 **Draft / unreviewed.** No publication approval, severity rating, or finding validity is implied.
 
-It never reads `creds.toml`, `lists/`, `targets/*/creds/` or `tooldata/`. `notes.md` and copied scans are as they were and can hold passwords; keep this report private.
+It never reads `creds.toml`, `lists/`, `targets/*/creds/` or `tooldata/`. `notes.md` and every copied file are as they were and can hold passwords; keep this report private.
 
 ## Box summary
 
@@ -118,7 +118,7 @@ Left out: the targets, the flags' values and the rest of the timeline and the in
 ## What it reads, and what it never does
 
 - **Every file the archive lists is accounted for.** Scans, screenshots and exploits are indexed and copied. Loot, recordings and a target's `files/` and `upload/` are indexed and not copied unless a selection file includes them. Anything else is listed by its path under `Not in the index`.
-- **Credentials stay out.** It never reads `creds.toml`, `lists/`, `targets/*/creds/` or `tooldata/`. `notes.md` and copied scans are as they were and can hold passwords; keep this report private. Each held-back place is named with its count of files, nothing more, and a selection file that names one is refused.
+- **Credential files stay out.** It never reads `creds.toml`, `lists/`, `targets/*/creds/` or `tooldata/`. `notes.md` and every copied file are as they were and can hold passwords; keep this report private. Each held-back place is named with its count of files, nothing more, and a selection file that names one is refused.
 - **The archive is checked, not trusted.** Every file the report uses has the size and SHA-256 the archive's manifest gives, or the build stops. Links, devices, paths that leave the box and archives past pwn-broker's own limits are refused before anything is read.
 - **Nothing runs and nothing leaves the machine.** Archived files are read as bytes. There is no network code at all.
 

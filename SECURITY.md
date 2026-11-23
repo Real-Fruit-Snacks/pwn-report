@@ -29,6 +29,6 @@ This is a one-person project. I read reports within a week. If it's real, the fi
 
 ## What it does not handle
 
-- The report is private. `notes.md` and copied scans are as they were and can hold passwords that were typed into the note or printed by a tool. pwn-report does not redact or scan for secrets, and never claims a report is safe to publish.
+- The report is private. `notes.md` and every copied file are as they were and can hold passwords: one typed into the note, one a tool printed into a scan, one on a screenshot, or one in loot a selection copied. pwn-report does not redact or scan for secrets, and never claims a report is safe to publish.
 - The manifest is not signed. The checks prove an archive is the one its manifest describes, not who made it.
 - Release files are checked against `SHA256SUMS.txt` from the same release, which catches a damaged download, not a replaced release.

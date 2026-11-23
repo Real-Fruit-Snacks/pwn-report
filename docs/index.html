@@ -122,7 +122,7 @@ pipx install ./pwn_report-0.1.0-py3-none-any.whl</code></pre><button class="copy
 
 **Draft / unreviewed.** No publication approval, severity rating, or finding validity is implied.
 
-It never reads `creds.toml`, `lists/`, `targets/*/creds/` or `tooldata/`. `notes.md` and copied scans are as they were and can hold passwords; keep this report private.
+It never reads `creds.toml`, `lists/`, `targets/*/creds/` or `tooldata/`. `notes.md` and every copied file are as they were and can hold passwords; keep this report private.
 
 <span class="eob">…</span>
 <span class="h">## Evidence index</span>
@@ -168,8 +168,8 @@ Held back, never read or copied:
         <ul class="ck spec" aria-label="What it reads">
             <li><span class="ch">Every listed file</span><span class="ld" aria-hidden="true"></span><span class="rs">Accounted for</span>
                 <p class="why">Scans, screenshots and exploits are indexed and copied. Loot, recordings and a target's <code>files/</code> and <code>upload/</code> are indexed and not copied unless a selection file includes them. Anything else is listed by its path under <code>Not in the index</code>.</p></li>
-            <li><span class="ch">Credentials</span><span class="ld" aria-hidden="true"></span><span class="rs">Stay out</span>
-                <p class="why">It never reads <code>creds.toml</code>, <code>lists/</code>, <code>targets/*/creds/</code> or <code>tooldata/</code>. <code>notes.md</code> and copied scans are as they were and can hold passwords; keep this report private. Each held-back place is named with its count of files, nothing more, and a selection file that names one is refused.</p></li>
+            <li><span class="ch">Credential files</span><span class="ld" aria-hidden="true"></span><span class="rs">Stay out</span>
+                <p class="why">It never reads <code>creds.toml</code>, <code>lists/</code>, <code>targets/*/creds/</code> or <code>tooldata/</code>. <code>notes.md</code> and every copied file are as they were and can hold passwords; keep this report private. Each held-back place is named with its count of files, nothing more, and a selection file that names one is refused.</p></li>
         </ul>
         <ul class="ck spec" aria-label="What it never does">
             <li><span class="ch">The archive</span><span class="ld" aria-hidden="true"></span><span class="rs">Checked, not trusted</span>

@@ -23,7 +23,7 @@ GENERATOR_VERSION = __version__
 # what the report never reads, and what it keeps as it was; the README quotes it word for word
 PRIVACY_NOTE = (
     "It never reads `creds.toml`, `lists/`, `targets/*/creds/` or `tooldata/`. "
-    "`notes.md` and copied scans are as they were and can hold passwords; keep this report private."
+    "`notes.md` and every copied file are as they were and can hold passwords; keep this report private."
 )
 _LINK = re.compile(r"(?<!\\)\[[^\]\n]*(?<!\\)\]\(([^)\s]+)\)")
 _CHECKSUM_ROW = re.compile(r"^([0-9a-f]{64})  (.+)$")

@@ -141,5 +141,5 @@ def test_the_review_status_says_what_is_never_read_and_what_is_kept():
 
     assert PRIVACY_NOTE == (
         "It never reads `creds.toml`, `lists/`, `targets/*/creds/` or `tooldata/`. "
-        "`notes.md` and copied scans are as they were and can hold passwords; keep this report private."
+        "`notes.md` and every copied file are as they were and can hold passwords; keep this report private."
     )

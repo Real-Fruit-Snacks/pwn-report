@@ -97,7 +97,7 @@ An evidence ID is `ev_` and the SHA-256 of the box's ID, the file's path and its
 
 A folder under `targets/` is a target only if it has its `target.toml`; files in one without it are listed under `Not in the index`. So is a file whose name holds a backslash or a control character. Neither stops the report.
 
-`notes.md` and the copied scans are copied as they were. pwn-broker's note keys can paste a credential into the note, and tool output in `scans/` often shows the passwords it found, so a report can hold passwords even though it never reads the credential files. It is private, and it says so at the top.
+`notes.md` and every copied file are copied as they were. pwn-broker's note keys can paste a credential into the note, tool output in `scans/` often shows the passwords it found, a screenshot can show one, and loot a selection copies can hold them, so a report can hold passwords even though it never reads the credential files. It is private, and it says so at the top.
 
 ## A selection file
 
