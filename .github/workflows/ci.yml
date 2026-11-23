@@ -104,6 +104,15 @@ jobs:
         run: |
           version="$(python -c 'import re, pathlib; print(re.search(r"__version__ = \"([^\"]+)\"", pathlib.Path("src/pwn_report/__init__.py").read_text()).group(1))')"
           python release/check_wheel.py "$RUNNER_TEMP/one/pwn_report-$version-py3-none-any.whl" "$version"
+      - name: The sdist's own suite
+        # pwn-shop builds its report package from the sdist, so the sdist must hold everything
+        # its own tests read
+        run: |
+          mkdir "$RUNNER_TEMP/sdist"
+          tar -xzf "$RUNNER_TEMP"/one/pwn_report-*.tar.gz -C "$RUNNER_TEMP/sdist"
+          cd "$RUNNER_TEMP"/sdist/pwn_report-*
+          python -m pip install pytest
+          python -m pytest -q -W error -p no:cacheprovider
       - name: Install the wheel alone and run it
         run: |
           python -m venv "$RUNNER_TEMP/venv"
