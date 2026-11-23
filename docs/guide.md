@@ -36,7 +36,7 @@ What it prints, and the exit status:
 | Ctrl-C | `fail  interrupted; no report was written` on stderr | 130 |
 | A mistake on the command line | the usage, on stderr | 2 |
 
-There is always exactly one line. A path that the terminal's encoding cannot show is printed with the character escaped, as `\xe9`, rather than failing after the report was written.
+A build always prints exactly one line, and a control or format character from a crafted name is shown as `?`, so the line stays one line. A path that the terminal's encoding cannot show is printed with the character escaped, as `\xe9`, rather than failing after the report was written.
 
 ## What a report folder holds
 
@@ -88,8 +88,8 @@ An evidence ID is `ev_` and the SHA-256 of the box's ID, the file's path and its
 
 | Where in the box | What happens |
 |---|---|
-| `targets/<t>/scans/`, `screenshots/`, `exploits/`, and `screenshots/` at the box's root | indexed and copied |
-| `targets/<t>/loot/`, `recordings/` | indexed; copied only when a selection includes the file |
+| `scans/`, `screenshots/` and `exploits/`, in a target or at the box's root | indexed and copied |
+| `loot/` and `recordings/`, in a target or at the box's root | indexed; copied only when a selection includes the file |
 | `targets/<t>/files/`, `upload/` | indexed; copied only when a selection includes the file |
 | `creds.toml`, `lists/`, `targets/<t>/creds/`, `tooldata/` | held back: never read or copied, never selectable, shown only as a count of files |
 | `box.toml`, `notes.md`, `manifest.toml`, `targets/<t>/target.toml` | read for the report itself; `notes.md` is copied |

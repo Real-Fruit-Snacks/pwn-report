@@ -22,6 +22,12 @@ on:
 permissions:
   contents: read
 
+# bash everywhere, Windows and macOS too, so every step runs with -e and pipefail: a test run
+# piped through tee fails the step when the tests fail
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
     runs-on: ubuntu-24.04

@@ -1,8 +1,7 @@
-"""Deterministic, test-only Broker archives and canonical-model oracles.
+"""Deterministic, test-only pwn-broker archives and the models they must give.
 
-Nothing here imports Broker or implements the future pwn-report CLI. The expected
-model is deliberately built from known fixture facts for comparison with a future
-production implementation.
+Nothing here imports pwn-broker or pwn_report. Each expected model is built from the fixture's
+own facts, independently of the code under test, so a test compares the two.
 """
 
 from __future__ import annotations

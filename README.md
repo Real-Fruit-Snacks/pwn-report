@@ -37,7 +37,7 @@ $ pwn-report build ~/pwn-broker/wrapped/2026-11-01_htb_forest.finished.tar.gz
 ok    report /home/kali/pwn-broker/wrapped/2026-11-01_htb_forest.finished.report
 ```
 
-Success is that one line and exit status 0. Anything else is one `fail` line and status 1, with nothing written: the report is built in a hidden folder beside the output and renamed into place only once every file and checksum is right.
+Success is that one line and exit status 0. A failure is one `fail` line and status 1, with nothing written, and a mistake on the command line prints the usage and status 2: the report is built in a hidden folder beside the output and renamed into place only once every file and checksum is right.
 
 ## What a report holds
 
