@@ -8,6 +8,7 @@ command at finish and relies on exactly these lines and statuses.
 from __future__ import annotations
 
 import argparse
+import signal
 import sys
 from pathlib import Path
 
@@ -72,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.select is not None and not args.select.is_file():
         return _fail(f"no selection file at {args.select}")
     output = args.output if args.output is not None else default_output(archive)
+    previous = _stop_on_signals()
     try:
         build_report(archive, output, args.select)
     except KeyboardInterrupt as exc:
@@ -87,5 +89,29 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         # a bug must still end in one line, not a traceback, for whoever runs this command
         return _fail(f"unexpected error: {type(exc).__name__}: {exc}")
+    finally:
+        for number, handler in previous.items():
+            signal.signal(number, handler)
     _say(f"ok    report {output}", sys.stdout)
     return 0
+
+
+def _interrupt(signum, frame) -> None:
+    raise KeyboardInterrupt
+
+
+def _stop_on_signals() -> dict:
+    """SIGTERM (pwn-broker's timeout, a kill) and SIGHUP (a closed terminal or SSH session) end the
+    build as Ctrl-C does, so its staging folder is removed; by default they end it on the spot.
+    Returns the handlers they replaced."""
+    previous = {}
+    for name in ("SIGTERM", "SIGHUP"):
+        number = getattr(signal, name, None)
+        if number is None:
+            continue
+        try:
+            previous[number] = signal.signal(number, _interrupt)
+        except (ValueError, OSError):
+            # not the main thread, as when a program imports and calls main: leave its handlers
+            pass
+    return previous

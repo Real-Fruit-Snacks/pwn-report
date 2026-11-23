@@ -253,12 +253,20 @@ def _member_sha(tar: tarfile.TarFile, member: tarfile.TarInfo, label: str) -> st
     return digest.hexdigest()
 
 
+def _entry_label(name: str) -> str:
+    """How an error names a member: by its name, or, inside a held-back place, by that place."""
+    root, _, rest = name.partition("/")
+    group = held_back_group(rest) if rest else None
+    return f"in {root}/{group}" if group else repr(name)
+
+
 def _check_member(member: tarfile.TarInfo) -> None:
     name = member.name
+    entry = _entry_label(name)
     # the same rule on every system, so an archive builds or fails the same everywhere; a member
     # name is never used as a path, only a portable manifest path is
     if _leaves_the_box(name):
-        raise ReportError(f"archive entry {name!r} escapes its box root")
+        raise ReportError(f"archive entry {entry} escapes its box root")
     try:
         name_bytes = len(name.encode("utf-8", "surrogateescape"))
     except UnicodeError as exc:
@@ -266,13 +274,13 @@ def _check_member(member: tarfile.TarInfo) -> None:
     if name_bytes > MAX_NAME_BYTES:
         raise ReportError(f"archive entry name exceeds {MAX_NAME_BYTES} bytes")
     if not (member.isreg() or member.isdir()):
-        raise ReportError(f"archive entry {name!r} is not a regular file or folder")
+        raise ReportError(f"archive entry {entry} is not a regular file or folder")
     if member.linkname or member.issparse():
-        raise ReportError(f"archive entry {name!r} names a link or sparse file")
+        raise ReportError(f"archive entry {entry} names a link or sparse file")
     if member.size < 0 or (member.isdir() and member.size):
-        raise ReportError(f"archive entry {name!r} has an invalid size")
+        raise ReportError(f"archive entry {entry} has an invalid size")
     if not (0 <= member.uid <= MAX_OWNER and 0 <= member.gid <= MAX_OWNER):
-        raise ReportError(f"archive entry {name!r} has an invalid owner")
+        raise ReportError(f"archive entry {entry} has an invalid owner")
 
 
 def _members(tar: tarfile.TarFile) -> tuple[str, dict[str, tarfile.TarInfo]]:
@@ -283,7 +291,7 @@ def _members(tar: tarfile.TarFile) -> tuple[str, dict[str, tarfile.TarInfo]]:
             raise ReportError("archive has a global extended header")
         _check_member(member)
         if member.name in by_name:
-            raise ReportError(f"archive entry {member.name!r} is duplicated")
+            raise ReportError(f"archive entry {_entry_label(member.name)} is duplicated")
         name_bytes = len(member.name.encode("utf-8", "surrogateescape"))
         if tar.fileobj.entry_bytes > HEADER_ROOM + 2 * name_bytes:
             raise ReportError("archive entry has more header bytes than its name allows")
@@ -548,8 +556,13 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
             used.add("manifest.toml")
 
         # archive order: a .tar.gz read backwards decompresses again from its start
+        target_bytes: dict[str, bytes] = {}
         for path in sorted(used, key=lambda name: member(name).offset_data):
-            if path not in hashes:
+            if path in target_paths:
+                # read here, in archive order: a pass of its own went back to the first target's
+                target_bytes[path] = _member_bytes(tar, member(path), MAX_SMALL_TOML_BYTES, path)
+                hashes[path] = _sha(target_bytes[path])
+            elif path not in hashes:
                 hashes[path] = _member_sha(tar, member(path), path)
             if path in records and hashes[path] != records[path]["sha256"]:
                 raise ReportError(f"{path} checksum differs from manifest.toml")
@@ -577,8 +590,7 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
 
         targets = []
         for path in sorted(target_paths, key=lambda name: member(name).offset_data):
-            target_bytes = _member_bytes(tar, member(path), MAX_SMALL_TOML_BYTES, path)
-            data = _toml(target_bytes, path)
+            data = _toml(target_bytes[path], path)
             _schema(data.get("schema"), f"{path} schema")
             expected_name = PurePosixPath(path).parts[1]
             target = {

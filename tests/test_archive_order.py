@@ -121,3 +121,43 @@ def test_the_evidence_list_is_walked_a_fixed_number_of_times(tmp_path, monkeypat
         build_report(archive, tmp_path / f"out-{count}")
         counts.append(len(walks))
     assert counts[0] == counts[1], counts
+
+
+
+def test_building_the_model_decompresses_the_archive_twice_at_most(tmp_path, monkeypatch):
+    # once to list the members, once to read the files the report uses. With two targets, reading
+    # each target.toml in a pass of its own went back to the first one and decompressed everything
+    # before it again: here a big screenshot at the box's root
+    import gzip
+    import hashlib
+
+    from fixtures import BOX_ID, NOW, _target_toml, _toml_value, add_members
+
+    base = make_archive(tmp_path / "base.tar.gz", full=True)
+    members = {path: data for path, data in base.members.items() if path != "manifest.toml"}
+    big = b"".join(hashlib.sha256(str(n).encode()).digest() for n in range(40_000))
+    second = _target_toml().replace(b'name = "dc01"', b'name = "web01"').replace(b"10.10.10.161", b"10.10.10.162")
+    second = second.replace(b'hostnames = ["forest.htb.local"]', b"hostnames = []")
+    extra = {"screenshots/big.png": big, "targets/web01/target.toml": second, "targets/web01/scans/a.txt": b"a"}
+    members.update(extra)
+    records = list(base.records) + [
+        file_record("screenshots/big.png", big),
+        file_record("targets/web01/target.toml", second, target="web01"),
+        file_record("targets/web01/scans/a.txt", b"a", target="web01", first_seen=NOW),
+    ]
+    members["manifest.toml"] = manifest_bytes(sorted(records, key=lambda r: r.path), kind=base.kind)
+    archive = write_raw_archive(tmp_path / "big.tar.gz", lambda tar: add_members(tar, members))
+    size = len(gzip.decompress(archive.read_bytes()))
+    read = []
+    original = gzip._GzipReader.read
+
+    def counting(self, size=-1):
+        # every byte gzip decompresses, also when a backward seek makes it start again
+        data = original(self, size)
+        read.append(len(data))
+        return data
+
+    monkeypatch.setattr(gzip._GzipReader, "read", counting)
+    model = build_model(archive)
+    assert [target["name"] for target in model["targets"]] == ["dc01", "web01"]
+    assert sum(read) <= 2.2 * size, (sum(read), size)

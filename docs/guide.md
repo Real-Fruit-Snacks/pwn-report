@@ -124,12 +124,12 @@ The selection file's SHA-256 is recorded in `report.toml` and `report.json`. [se
 
 ## How the archive is checked
 
-The archive is untrusted input, read once to build the model and once to copy the evidence, front to back, never unpacked to disk.
+The archive is untrusted input, read front to back at most three times: once to list its members, once to check the files the report uses against the manifest, and once to copy the evidence. It is never unpacked to disk.
 
 - **Members**: regular files and folders only. Links, devices, pipes and sparse files are refused, as is a name that is absolute, starts with a drive letter, or climbs out with `..` by either kind of slash. One box folder holds everything.
 - **Limits**, the same as pwn-broker's own: at most 300,000 members, 4,096 bytes for a name and 64 MiB for all names together, a manifest of at most 64 MiB and `box.toml`, `target.toml` and a selection of at most 1 MiB each, and per-member header limits.
 - **The manifest**: every file the report uses must be listed with the size and SHA-256 it has; a changed or missing file stops the build. Held-back files are counted from the manifest alone.
-- **Writing**: the report is built in a hidden folder beside the output, checked file by file against the model and `SHA256SUMS`, and renamed into place only when everything matches and the archive's SHA-256 is still the one read at the start. On any failure the hidden folder is removed; if it cannot be, the `fail` line names it, since it holds copied evidence.
+- **Writing**: the report is built in a hidden folder beside the output, checked file by file against the model and `SHA256SUMS`, and renamed into place only when everything matches and the archive's SHA-256 is still the one read at the start. On Linux and macOS the folder is readable only by its owner, mode 0700, and keeps that mode once renamed. On any failure, Ctrl-C included, and on Linux and macOS SIGTERM and SIGHUP too, the hidden folder is removed; if it cannot be, the `fail` line names it, since it holds copied evidence.
 - **Names the system cannot hold**: on Windows, a name Windows refuses (`CON`, `aux.txt`, a trailing dot or space, `<>:"|?*`), and on Windows and macOS, two names that differ only in case or in Unicode form, stop the build before anything is written, naming the files. Leave one out with a selection rule, or build on Linux.
 
 ## The same report every time

@@ -173,7 +173,7 @@ def _render_markdown(model: dict) -> bytes:
                     f"- ID: {_md_text(item['id'])}",
                     f"- Target references: {_md_text(', '.join(item['target_refs']) or 'None')}",
                     f"- First seen: {_md_text(item['first_seen'])}",
-                    f"- Size: {item['size']} bytes",
+                    f"- Size: {item['size']} {'byte' if item['size'] == 1 else 'bytes'}",
                     f"- SHA-256: {_md_text(item['sha256'])}",
                 )
             )

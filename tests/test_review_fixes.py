@@ -456,3 +456,79 @@ def test_on_windows_such_a_folder_is_never_made(tmp_path, name):
     with pytest.raises(ReportError, match="-o"):
         build_report(fixture.path, tmp_path / name)
     assert sorted(p.name for p in tmp_path.iterdir()) == ["a.tar.gz"]
+
+
+
+@pytest.mark.parametrize("held", ["lists/SECRET-INNER-NAME", "targets/dc01/creds/SECRET-INNER-NAME", "tooldata/x/SECRET-INNER-NAME"])
+@pytest.mark.parametrize("shape", ["link", "duplicate"])
+def test_a_member_error_inside_a_held_back_place_names_the_place(tmp_path, held, shape):
+    import tarfile
+
+    base = make_archive(tmp_path / "b.tar.gz", full=True)
+
+    def write(tar):
+        add_members(tar, {p: d for p, d in base.members.items()})
+        if shape == "link":
+            info = tarfile.TarInfo(f"{BOX_ID}/{held}")
+            info.type = tarfile.SYMTYPE
+            info.linkname = "x"
+            tar.addfile(info)
+        else:
+            for _ in range(2):
+                info = tarfile.TarInfo(f"{BOX_ID}/{held}")
+                info.size = 1
+                import io
+
+                tar.addfile(info, io.BytesIO(b"x"))
+
+    bad = write_raw_archive(tmp_path / "bad.tar.gz", write)
+    with pytest.raises(ReportError) as raised:
+        build_model(bad)
+    message = str(raised.value)
+    assert "SECRET-INNER-NAME" not in message
+    group = held.split("/SECRET")[0]
+    group = group if group.startswith("targets/") else group.split("/")[0]
+    assert group in message, message
+
+
+def test_one_byte_is_one_byte(tmp_path):
+    path = "targets/dc01/scans/one.txt"
+    archive = _with_listed(tmp_path, {path: b"x"}, targets={path: "dc01"})
+    build_report(archive, tmp_path / "out")
+    text = (tmp_path / "out" / "report.md").read_text(encoding="utf-8")
+    entry = text[text.index("#### targets/dc01/scans/one.txt"):]
+    assert "- Size: 1 byte\n" in entry.split("\n\n#### ")[0]
+    assert "bytes" in text  # every other file is larger than one byte
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows ends a process on SIGTERM with no handler run")
+@pytest.mark.parametrize("name", ["SIGTERM", "SIGHUP"])
+def test_a_signal_to_stop_cleans_up_like_ctrl_c(tmp_path, capsys, monkeypatch, name):
+    import signal
+    import time
+
+    from pwn_report import output
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    number = getattr(signal, name)
+    before = signal.getsignal(number)
+
+    def stopped(*args, **kwargs):
+        os.kill(os.getpid(), number)
+        time.sleep(5)
+
+    monkeypatch.setattr(output, "_validate_staging", stopped)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
+    assert capsys.readouterr().err == "fail  interrupted; no report was written\n"
+    assert not (tmp_path / "out").exists() and not list(tmp_path.glob(".out.tmp-*"))
+    assert signal.getsignal(number) == before
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows gives a folder no mode bits")
+def test_the_report_folder_is_its_owners_alone(tmp_path):
+    # the staging folder is made 0700 and renamed into place, so the evidence is never open to others
+    import stat
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    build_report(fixture.path, tmp_path / "out")
+    assert stat.S_IMODE((tmp_path / "out").stat().st_mode) == 0o700
