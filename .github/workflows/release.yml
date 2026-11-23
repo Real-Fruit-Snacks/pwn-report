@@ -1,0 +1,186 @@
+name: release
+
+# A vX.Y.Z tag push: check the tag matches the package version, build the sdist and the wheel
+# with the locked build tools, record their SHA-256, run the suite against the built wheel, and
+# publish the release with notes from CHANGELOG.md and exactly three files:
+#   pwn_report-<version>-py3-none-any.whl   the wheel
+#   pwn_report-<version>.tar.gz             the sdist, which pwn-shop's report package builds from
+#   SHA256SUMS.txt                          the checksums of both
+#
+# The build job has read access only. Everything it installs before the SHA-256 is recorded is
+# pinned by hash in release/build-requirements.lock. The files and the notes are set aside before
+# anything unpinned runs (pytest), with their SHA-256 recorded, and the publish job, which has
+# write access and runs none of the repository's code, refuses any file whose SHA-256 differs.
+#
+# Run by hand (workflow_dispatch), whatever ref it is started from, it is a dry run: the version
+# is the package's, both jobs run every step, and only the step that publishes is skipped.
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      sums: ${{ steps.sums.outputs.sums }}
+      notes_sha256: ${{ steps.aside.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Version
+        # the one version, __version__ in src/pwn_report/__init__.py
+        id: version
+        run: |
+          version="$(python -c 'import re, pathlib; print(re.search(r"__version__ = \"([^\"]+)\"", pathlib.Path("src/pwn_report/__init__.py").read_text()).group(1))')"
+          test -n "$version"
+          echo "VERSION=$version" >>"$GITHUB_ENV"
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+          echo "ok    version $version"
+      - name: Tag matches the version
+        # v*.*.* also matches a tag such as v0.2.0-rc1, which would be published as latest. A dry
+        # run has no tag, so it checks the tag the version would need.
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$VERSION"
+          fi
+          if ! printf '%s\n' "$tag" | grep -Eqx 'v[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::tag $tag is not v followed by three dot-separated numbers, such as v0.2.0"
+            exit 1
+          fi
+          if [ "${tag#v}" != "$VERSION" ]; then
+            echo "::error::tag is $tag but the package version is $VERSION"
+            exit 1
+          fi
+          echo "ok    tag $tag"
+      - name: Build tools from the lock
+        run: |
+          python -m pip install --require-hashes --only-binary :all: -r release/build-requirements.lock
+      - name: Build the sdist and the wheel
+        run: python -m hatchling build -d "$RUNNER_TEMP/dist"
+      - name: Record their SHA-256
+        # taken before anything unpinned is installed; the publish job compares with this
+        id: sums
+        working-directory: ${{ runner.temp }}/dist
+        run: |
+          ls -l
+          test "$(ls | wc -l)" = 2
+          test -f "pwn_report-$VERSION-py3-none-any.whl"
+          test -f "pwn_report-$VERSION.tar.gz"
+          sha256sum "pwn_report-$VERSION-py3-none-any.whl" "pwn_report-$VERSION.tar.gz" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          echo "sums=$(sha256sum SHA256SUMS.txt | cut -d ' ' -f 1)" >>"$GITHUB_OUTPUT"
+      - name: Check the wheel
+        run: python release/check_wheel.py "$RUNNER_TEMP/dist/pwn_report-$VERSION-py3-none-any.whl" "$VERSION"
+      - name: Notes from CHANGELOG.md
+        run: |
+          upload="$RUNNER_TEMP/release-upload"
+          mkdir -p "$upload"
+          # the section headed "## vX.Y.Z", with or without an "(unreleased)" suffix
+          awk -v h="## v$VERSION" '
+            on && /^## / { exit }
+            $0 == h || index($0, h " ") == 1 { on = 1; next }
+            on { print }
+          ' CHANGELOG.md > "$upload/notes.md"
+          if ! grep -q '[^[:space:]]' "$upload/notes.md"; then
+            echo "::error::CHANGELOG.md has no notes under '## v$VERSION'"
+            exit 1
+          fi
+          cat "$upload/notes.md"
+      - name: Set aside what a release publishes
+        id: aside
+        run: |
+          upload="$RUNNER_TEMP/release-upload"
+          cp "$RUNNER_TEMP"/dist/* "$upload/"
+          ls -l "$upload"
+          notes="$(sha256sum "$upload/notes.md" | cut -d ' ' -f 1)"
+          echo "notes=$notes" >>"$GITHUB_OUTPUT"
+          echo "ok    notes.md has SHA-256 $notes"
+      - name: The suite against the built wheel
+        # The tests run from the checkout but import the installed wheel, not src/: pytest.ini's
+        # pythonpath is emptied, and the import is checked. pytest is the one unpinned thing,
+        # installed after the files were set aside.
+        run: |
+          python -m venv "$RUNNER_TEMP/suite"
+          suite="$RUNNER_TEMP/suite/bin/python"
+          "$suite" -m pip install --no-index --no-deps "$RUNNER_TEMP/dist/pwn_report-$VERSION-py3-none-any.whl"
+          "$suite" -m pip install pytest
+          imported="$(cd "$RUNNER_TEMP" && "$suite" -c 'import pwn_report; print(pwn_report.__file__)')"
+          echo "pwn_report is imported from $imported"
+          case "$imported" in
+            "$RUNNER_TEMP/suite/lib/"*/site-packages/pwn_report/*) ;;
+            *) echo "fail  pwn_report is not imported from the installed wheel"; exit 1 ;;
+          esac
+          "$suite" -m pytest -q -W error -o pythonpath=
+      - name: Release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: ${{ runner.temp }}/release-upload/
+
+  publish:
+    # Runs on a dry run too, so every check below runs; only the Publish step needs a tag push.
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-files
+          path: ${{ runner.temp }}/release-files
+      - name: Check the files against the build
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          RECORDED_SUMS: ${{ needs.build.outputs.sums }}
+          RECORDED_NOTES: ${{ needs.build.outputs.notes_sha256 }}
+        run: |
+          cd "$RUNNER_TEMP/release-files"
+          ls -l
+          test -n "$VERSION"
+          for name in "pwn_report-$VERSION-py3-none-any.whl" "pwn_report-$VERSION.tar.gz" SHA256SUMS.txt notes.md; do
+            if [ ! -f "$name" ]; then
+              echo "fail  the artifact has no $name"
+              exit 1
+            fi
+          done
+          test "$(wc -l <SHA256SUMS.txt)" = 2
+          sha256sum -c SHA256SUMS.txt
+          same() {
+            found="$(sha256sum "$1" | cut -d ' ' -f 1)"
+            if [ "$found" != "$2" ]; then
+              echo "fail  $1 has SHA-256 $found, not the $2 the build job recorded"
+              exit 1
+            fi
+            echo "ok    $1 has the SHA-256 the build job recorded, $found"
+          }
+          same SHA256SUMS.txt "$RECORDED_SUMS"
+          same notes.md "$RECORDED_NOTES"
+      - name: Publish
+        # created as a draft with all three files, then made public and latest
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          cd "$RUNNER_TEMP/release-files"
+          gh release create "$GITHUB_REF_NAME" "pwn_report-$VERSION-py3-none-any.whl" "pwn_report-$VERSION.tar.gz" SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag --draft
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+      - name: Dry run
+        if: github.event_name != 'push' || github.ref_type != 'tag'
+        run: |
+          echo "ok    dry run: nothing was published"
+          cat "$RUNNER_TEMP/release-files/SHA256SUMS.txt"

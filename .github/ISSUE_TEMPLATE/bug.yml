@@ -1,0 +1,41 @@
+name: Bug
+description: pwn-report or its docs don't do what the README says
+labels: [bug]
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: pwn-report (`pwn-report --version`), Python (`python3 --version`), and pwn-broker if the archive came from it (`pwn-broker --version`)
+      placeholder: pwn-report 0.1.0, Python 3.13.5, pwn-broker 0.1.11
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: Run on
+      options: [Kali, Another Linux, Windows, macOS]
+    validations:
+      required: true
+  - type: textarea
+    id: typed
+    attributes:
+      label: What I ran
+      description: The command, as typed, or that pwn-broker's finish ran it
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: printed
+    attributes:
+      label: What it printed
+      description: Remove real credentials, flags, addresses and file names first. Placeholders are fine. Never attach an archive or a report.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true

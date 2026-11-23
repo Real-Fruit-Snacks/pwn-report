@@ -1,0 +1,114 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # The whole suite on Linux, on every Python the package supports, warnings treated as errors.
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+      - name: Tests
+        run: python -m pytest -q -W error
+
+  test-other-systems:
+    # A report folder is written with names Windows and macOS refuse or fold together, so the
+    # suite runs there too: the case-clash test only runs on a file system that folds case.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+      - name: Tests
+        run: python -m pytest -q -W error
+
+  broker:
+    # Reports from archives that pwn-broker's own code makes: a box with no targets and an empty
+    # os and difficulty, and a full box exported and finished. pwn-broker is checked out at a
+    # release and installed into the same environment, so its dependencies are there.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          repository: Real-Fruit-Snacks/pwn-broker
+          ref: v0.1.11
+          path: broker
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install pwn-report and pwn-broker
+        run: python -m pip install -e ".[dev]" ./broker
+      - name: Reports from pwn-broker's archives
+        env:
+          PWN_REPORT_BROKER_SRC: ${{ github.workspace }}/broker
+        run: |
+          python -m pytest -q -W error tests/test_broker_compat.py | tee "$RUNNER_TEMP/compat.txt"
+          if grep -q skipped "$RUNNER_TEMP/compat.txt"; then
+            echo "fail  the pwn-broker compatibility tests were skipped"
+            exit 1
+          fi
+
+  build:
+    # The sdist and the wheel, built twice with the locked build tools to the same bytes; the
+    # wheel checked to be pure and to hold pwn_report only, then installed into an empty
+    # environment and run on a fixture archive.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Build tools from the lock
+        run: |
+          python -m pip install --require-hashes --only-binary :all: -r release/build-requirements.lock
+      - name: Build twice
+        run: |
+          python -m hatchling build -d "$RUNNER_TEMP/one"
+          python -m hatchling build -d "$RUNNER_TEMP/two"
+          (cd "$RUNNER_TEMP/one" && sha256sum *) | tee "$RUNNER_TEMP/one.sums"
+          (cd "$RUNNER_TEMP/two" && sha256sum *) > "$RUNNER_TEMP/two.sums"
+          if ! cmp -s "$RUNNER_TEMP/one.sums" "$RUNNER_TEMP/two.sums"; then
+            echo "fail  two builds of the same commit differ"
+            exit 1
+          fi
+          echo "ok    two builds gave the same sdist and wheel"
+      - name: Check the wheel
+        run: |
+          version="$(python -c 'import re, pathlib; print(re.search(r"__version__ = \"([^\"]+)\"", pathlib.Path("src/pwn_report/__init__.py").read_text()).group(1))')"
+          python release/check_wheel.py "$RUNNER_TEMP/one/pwn_report-$version-py3-none-any.whl" "$version"
+      - name: Install the wheel alone and run it
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --no-index --no-deps "$RUNNER_TEMP"/one/*.whl
+          "$RUNNER_TEMP/venv/bin/pwn-report" --version
+          python -c 'import sys, pathlib; sys.path[:0] = ["tests"]; from fixtures import make_archive; make_archive(pathlib.Path(sys.argv[1]), full=True, kind="finished")' "$RUNNER_TEMP/2026-11-14_htb_forest.finished.tar.gz"
+          "$RUNNER_TEMP/venv/bin/pwn-report" build "$RUNNER_TEMP/2026-11-14_htb_forest.finished.tar.gz"
+          test -f "$RUNNER_TEMP/2026-11-14_htb_forest.finished.report/report.md"

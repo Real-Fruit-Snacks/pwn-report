@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/Real-Fruit-Snacks/pwn-report/security/advisories/new
+    about: Anything that writes outside the report folder, copies a held-back file, or lets a credential or an archived file's content reach a report goes here, not in a public issue
