@@ -310,12 +310,16 @@ def test_notes_paths_are_fixed_and_unknown_nested_properties_fail(tmp_path):
     _reject(model)
 
 
-def test_build_model_rejects_evidence_with_a_dangling_original_target(tmp_path):
+def test_evidence_of_a_target_with_no_target_toml_is_listed_as_other(tmp_path):
+    # a folder under targets/ is a target only with its target.toml; files in one without it are
+    # listed by path, so one stray folder never costs the whole report
     fixture = make_archive(tmp_path / "source" / "forest.tar.gz", full=True)
     members = dict(fixture.members)
     del members[TARGET]
     records = [record for record in fixture.records if record.path != TARGET]
     members["manifest.toml"] = manifest_bytes(records, kind=fixture.kind)
     archive = write_archive(tmp_path / "dangling-target.tar.gz", members)
-    with pytest.raises(ReportError, match="unknown target"):
-        build_model(archive)
+    model = build_model(archive)
+    assert model["targets"] == []
+    assert not any(item["target"] == "dc01" for item in model["evidence"])
+    assert "targets/dc01/scans/nmap.txt" in model["other"]

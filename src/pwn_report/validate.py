@@ -9,7 +9,7 @@ from datetime import datetime
 
 from .report import (
     ALL_KINDS, DEFAULT_OMITTED, MAY_BE_EMPTY, METADATA, ReportError, _event_key, _evidence_location,
-    held_back_group, is_target_toml,
+    _leaves_the_box, held_back_group, is_portable, is_target_toml,
 )  # fmt: skip
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -364,14 +364,18 @@ def validate_model(model: dict) -> dict:
         _fail("model.held_back", "must be sorted by path without duplicates")
     other = _strings(model["other"], "model.other", nonempty=True)
     for index, path in enumerate(other):
-        _path(path, f"model.other[{index}]")
-        if (
-            _evidence_location(path) is not None
-            or held_back_group(path) is not None
-            or path in METADATA
-            or is_target_toml(path)
-        ):
-            _fail(f"model.other[{index}]", "is evidence, held back or metadata, not other")
+        label = f"model.other[{index}]"
+        # other holds any listed name inside the box, odd ones too; only the classified ones are wrong here
+        if _leaves_the_box(path):
+            _fail(label, "is not a path inside the box")
+        if held_back_group(path) is not None or path in METADATA:
+            _fail(label, "is held back or metadata, not other")
+        if is_portable(path):
+            location = _evidence_location(path)
+            if is_target_toml(path) or (
+                location is not None and (not location[0] or location[0] in target_by_name)
+            ):
+                _fail(label, "is evidence or a target, not other")
     if other != sorted(other):
         _fail("model.other", "must be sorted")
 

@@ -10,6 +10,7 @@ import shutil
 import tarfile
 import zlib
 import tempfile
+import unicodedata
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, quote
 
@@ -56,8 +57,11 @@ def _metadata_toml(model: dict) -> bytes:
 
 
 def _md_text(value: str) -> str:
-    """Keep source strings as literal inline Markdown data, including HTML-like text."""
+    """Keep source strings as literal inline Markdown data, including HTML-like text. A control
+    or format character (an escape sequence, a right-to-left override) is shown as ?, so
+    reading report.md in a terminal cannot run one and a name cannot disguise itself."""
     value = value.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
+    value = "".join("?" if unicodedata.category(character) in {"Cc", "Cf"} else character for character in value)
     value = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     for character in ("\\", "`", "*", "_", "[", "]", "|"):
         value = value.replace(character, "\\" + character)

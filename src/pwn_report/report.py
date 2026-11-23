@@ -153,18 +153,41 @@ def _checksum(value, label: str) -> str:
     return value
 
 
-def _relative_path(value, label: str) -> str:
-    value = _text(value, label)
-    parts = value.split("/")
-    if (
-        value.startswith("/")
+def _leaves_the_box(value: str) -> bool:
+    """Absolute, on a drive, or climbing out with .. by either separator."""
+    return (
+        value.startswith(("/", "\\"))
+        or (len(value) >= 2 and value[0].isalpha() and value[1] == ":")
+        or ".." in value.replace("\\", "/").split("/")
+        or "\0" in value
+    )
+
+
+def is_portable(value: str) -> bool:
+    """A relative path that means the same file on every system: / only, no empty, . or ..
+    parts, no control characters."""
+    return not (
+        _leaves_the_box(value)
         or "\\" in value
         or value.endswith("/")
-        or (len(value) >= 2 and value[0].isalpha() and value[1] == ":")
-        or any(part in {"", ".", ".."} for part in parts)
-        or any(ord(character) < 32 for character in value)
-    ):
+        or any(part in {"", ".", ".."} for part in value.split("/"))
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+    )
+
+
+def _relative_path(value, label: str) -> str:
+    value = _text(value, label)
+    if not is_portable(value):
         raise ReportError(f"{label} is not a portable relative path")
+    return value
+
+
+def _listed_path(value, label: str) -> str:
+    """A manifest row's path: refused only if it leaves the box. A name with a backslash or a
+    control character is listed as other and never read."""
+    value = _text(value, label)
+    if _leaves_the_box(value) or any(part in {"", "."} for part in value.split("/")):
+        raise ReportError(f"manifest.toml lists {value!r}, which is not a portable relative path inside the box")
     return value
 
 
@@ -217,12 +240,9 @@ def _member_sha(tar: tarfile.TarFile, member: tarfile.TarInfo, label: str) -> st
 
 def _check_member(member: tarfile.TarInfo) -> None:
     name = member.name
-    if (
-        name.startswith("/")
-        or (len(name) >= 2 and name[0].isalpha() and name[1] == ":")
-        or (os.sep == "\\" and "\\" in name)
-        or ".." in name.split("/")
-    ):
+    # the same rule on every system, so an archive builds or fails the same everywhere; a member
+    # name is never used as a path, only a portable manifest path is
+    if _leaves_the_box(name):
         raise ReportError(f"archive entry {name!r} escapes its box root")
     try:
         name_bytes = len(name.encode("utf-8", "surrogateescape"))
@@ -279,7 +299,7 @@ def _record(row, label: str) -> dict:
     if not isinstance(row, dict):
         raise ReportError(f"{label} must be a table")
     return {
-        "path": _relative_path(row.get("path"), f"{label}.path"),
+        "path": _listed_path(row.get("path"), f"{label}.path"),
         "target": _text(row.get("target"), f"{label}.target", empty=True),
         "first_seen": _time(row.get("first_seen"), f"{label}.first_seen"),
         "size": _size(row.get("size"), f"{label}.size"),
@@ -289,13 +309,14 @@ def _record(row, label: str) -> dict:
 
 
 def held_back_group(path: str) -> str | None:
-    """The held-back location a path is in: creds.toml, lists/, targets/<t>/creds/ or tooldata/."""
-    parts = PurePosixPath(path).parts
+    """The held-back location a path is in: creds.toml, lists/, targets/<t>/creds/ or tooldata/.
+    A target folder whose name is not portable is not one pwn-broker made, so not a creds folder."""
+    parts = path.split("/")
     if path == "creds.toml":
         return "creds.toml"
     if len(parts) >= 2 and parts[0] in {"lists", "tooldata"}:
         return parts[0] + "/"
-    if len(parts) >= 4 and parts[0] == "targets" and parts[2] == "creds":
+    if len(parts) >= 4 and parts[0] == "targets" and parts[2] == "creds" and is_portable(parts[1]):
         return f"targets/{parts[1]}/creds/"
     return None
 
@@ -431,11 +452,15 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
         for index, row in enumerate(raw_rows):
             record = _record(row, f"manifest.toml file[{index}]")
             path = record["path"]
+            group = held_back_group(path)
+            named = f"a file in {group}" if group else path
             if path in records:
-                raise ReportError(f"{path} is listed twice in manifest.toml")
-            archived = member(path)
+                raise ReportError(f"{named} is listed twice in manifest.toml")
+            archived = members.get(f"{root}/{path}")
+            if archived is None or not archived.isreg():
+                raise ReportError(f"{named} is missing from the archive")
             if archived.size != record["size"]:
-                raise ReportError(f"{path} size differs from manifest.toml")
+                raise ReportError(f"{named} size differs from manifest.toml")
             records[path] = record
 
         manifest_box = manifest.get("box")
@@ -460,12 +485,20 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
         evidence_rows = []
         held_counts: dict[str, int] = {}
         other = []
+        # the targets the box has: a folder under targets/ without its target.toml is not one
+        target_names = {
+            PurePosixPath(path).parts[1] for path in records if is_portable(path) and is_target_toml(path)
+        }
         # every listed file is one of: held back, a target's target.toml, evidence, metadata, other
         for path, record in records.items():
             group = held_back_group(path)
             if group is not None:
                 # counted from the manifest alone: never hashed, read or copied
                 held_counts[group] = held_counts.get(group, 0) + 1
+                continue
+            if not is_portable(path):
+                # a backslash or a control character: listed by name, never read
+                other.append(path)
                 continue
             if is_target_toml(path):
                 if record["target"] != PurePosixPath(path).parts[1]:
@@ -474,6 +507,9 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
                 used.add(path)
                 continue
             location = _evidence_location(path)
+            if location is not None and location[0] and location[0] not in target_names:
+                other.append(path)
+                continue
             if location is not None:
                 target, _ = location
                 if record["target"] != target:
