@@ -4,13 +4,49 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pwn-report"
-version = "0.1.0"
-description = "Deterministic evidence-linked reports from pwn-broker archives"
+dynamic = ["version"]
+description = "Private, evidence-linked reports from pwn-broker archives"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Real-Fruit-Snacks" }]
 requires-python = ">=3.11"
 dependencies = []
+classifiers = [
+  "Environment :: Console",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Security",
+]
+
+[project.urls]
+Homepage = "https://real-fruit-snacks.github.io/pwn-report/"
+Source = "https://github.com/Real-Fruit-Snacks/pwn-report"
+Changelog = "https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/CHANGELOG.md"
+
+[project.scripts]
+pwn-report = "pwn_report.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 
+[tool.hatch.version]
+path = "src/pwn_report/__init__.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/pwn_report"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/pwn_report",
+  "tests",
+  "LICENSE",
+  "README.md",
+  "CHANGELOG.md",
+  "pyproject.toml",
+  "pytest.ini",
+]

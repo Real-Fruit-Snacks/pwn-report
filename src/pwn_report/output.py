@@ -12,10 +12,11 @@ import tempfile
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, quote
 
+from . import __version__
 from .report import READ_BYTES, ReportError, _file_sha, _members, _open, build_model
 from .validate import validate_model
 
-GENERATOR_VERSION = "0.1.0"
+GENERATOR_VERSION = __version__
 _LINK = re.compile(r"(?<!\\)\[[^\]\n]*(?<!\\)\]\(([^)\s]+)\)")
 _CHECKSUM_ROW = re.compile(r"^([0-9a-f]{64})  (.+)$")
 
