@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import tomllib
-from copy import deepcopy
 
 import pytest
 
 from pwn_report import ReportError, build_model
 
-from fixtures import LATER, make_archive, sha256, write_archive
+from fixtures import LATER, make_archive, write_archive
 
 
 def test_h03_finished_archive_preserves_finished_time_without_publishing(tmp_path):
