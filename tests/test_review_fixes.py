@@ -734,3 +734,27 @@ def test_a_selection_file_name_with_a_line_separator_is_refused(tmp_path):
     selection.write_bytes(b"schema = 1\n")
     with pytest.raises(ReportError, match="selection filename is not portable"):
         build_model(fixture.path, selection)
+
+
+def test_a_stop_while_the_handlers_are_set_is_one_line(tmp_path, capsys, monkeypatch, own_handlers):
+    import signal
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    real = signal.signal
+    calls = []
+
+    def setting(number, handler):
+        previous = real(number, handler)
+        calls.append(number)
+        if len(calls) == 1:
+            raise KeyboardInterrupt  # the stop lands once the first handler is set
+        return previous
+
+    monkeypatch.setattr(cli.signal, "signal", setting)
+    try:
+        status = cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")])
+    except KeyboardInterrupt:
+        pytest.fail("a stop while the handlers were set escaped main")
+    assert status == 130
+    assert capsys.readouterr().err == "fail  interrupted; no report was written\n"
+    assert not (tmp_path / "out").exists() and not list(tmp_path.glob(".out.tmp-*"))

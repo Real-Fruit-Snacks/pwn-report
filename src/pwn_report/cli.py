@@ -73,10 +73,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.select is not None and not args.select.is_file():
         return _fail(f"no selection file at {args.select}")
     output = args.output if args.output is not None else default_output(archive)
-    previous = _stop_on_signals()
+    previous: dict = {}
     built = False
     try:
         try:
+            # inside the try: a stop that lands while they are set is one line too
+            _stop_on_signals(previous)
             build_report(archive, output, args.select)
             built = True
         finally:
@@ -102,14 +104,13 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _stop_on_signals() -> dict:
+def _stop_on_signals(previous: dict) -> None:
     """Ctrl-C (SIGINT), SIGTERM (pwn-broker's timeout, a kill) and SIGHUP (a closed terminal or SSH
     session) end the build with KeyboardInterrupt, so its staging folder is removed; by default
     SIGTERM and SIGHUP end it on the spot. The first stop wins and the rest are ignored from then
     on, so a second cannot cut the removal short. A signal the caller ignores, as nohup ignores
-    SIGHUP, stays ignored, and one whose handler Python cannot put back is left alone. Returns the
-    handlers replaced."""
-    previous: dict = {}
+    SIGHUP, stays ignored, and one whose handler Python cannot put back is left alone. Each
+    handler replaced is recorded in previous, to be put back."""
 
     def stop(signum, frame) -> None:
         for number in previous:
@@ -128,7 +129,6 @@ def _stop_on_signals() -> dict:
         except (ValueError, OSError):
             # not the main thread, as when a program imports and calls main: leave its handlers
             pass
-    return previous
 
 
 def _put_back(previous: dict) -> None:
