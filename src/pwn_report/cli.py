@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import unicodedata
 from pathlib import Path
 
 from . import __version__
@@ -48,7 +49,10 @@ def _parser() -> argparse.ArgumentParser:
 
 def _say(text: str, stream) -> None:
     """One line, whatever the stream's encoding: a character it cannot hold is escaped, so a
-    report already written is never reported as a failure because its path cannot be printed."""
+    report already written is never reported as a failure because its path cannot be printed.
+    A control or format character, which only a crafted name can bring, is shown as ?: a line
+    break would split the line in two and an escape sequence would reach the terminal."""
+    text = "".join("?" if unicodedata.category(character) in {"Cc", "Cf"} else character for character in text)
     try:
         print(text, file=stream)
     except UnicodeEncodeError:

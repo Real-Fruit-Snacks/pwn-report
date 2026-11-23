@@ -330,3 +330,18 @@ def test_the_timeline_names_files_by_path_alone(tmp_path):
     timeline = text[text.index("## Timeline\n"):text.index("## Evidence index\n")]
     assert "File first seen: targets/dc01/scans/nmap.txt\n" in timeline
     assert "ev\\_" not in timeline
+
+
+
+@pytest.mark.parametrize("odd", ["dir/name\nwith a break.txt", "dir/esc\x1b[31m.txt", "dir/rtl‮.txt"])
+def test_the_fail_line_is_one_line_with_no_control_or_format_character(tmp_path, capsys, odd):
+    # a listed file missing from the archive fails naming its path as listed; a crafted name must
+    # not break the line in two or reach the terminal as an escape, since pwn-broker prints it
+    base = make_archive(tmp_path / "b.tar.gz", full=True)
+    members = {p: d for p, d in base.members.items() if p != "manifest.toml"}
+    members["manifest.toml"] = manifest_bytes([*base.records, file_record(odd, b"x")], kind=base.kind)
+    bad = write_raw_archive(tmp_path / "bad.tar.gz", lambda tar: add_members(tar, members))
+    assert cli.main(["build", str(bad)]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith("fail  ") and err.count("\n") == 1 and err.endswith("\n")
+    assert "\x1b" not in err and "‮" not in err and "?" in err
