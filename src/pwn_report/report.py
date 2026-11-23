@@ -14,6 +14,7 @@ import os
 import tarfile
 import zlib
 import tomllib
+import unicodedata
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -163,15 +164,29 @@ def _leaves_the_box(value: str) -> bool:
     )
 
 
+# a control character (C0, DEL or C1), a format character, or a line or paragraph separator:
+# each is more than text to a terminal, to str.splitlines, or to a reader looking at a name
+UNSAFE_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})
+
+
+def has_unsafe_character(value: str) -> bool:
+    return any(unicodedata.category(character) in UNSAFE_CATEGORIES for character in value)
+
+
+def shown(value: str) -> str:
+    """The value with each unsafe character replaced by ?."""
+    return "".join("?" if unicodedata.category(character) in UNSAFE_CATEGORIES else character for character in value)
+
+
 def is_portable(value: str) -> bool:
     """A relative path that means the same file on every system: / only, no empty, . or ..
-    parts, no control characters."""
+    parts, no unsafe character."""
     return not (
         _leaves_the_box(value)
         or "\\" in value
         or value.endswith("/")
         or any(part in {"", ".", ".."} for part in value.split("/"))
-        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+        or has_unsafe_character(value)
     )
 
 
@@ -418,7 +433,7 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
         selection_data = _toml(selection_bytes, "selection")
         selection_rules = _selection_rules(selection_data)
         name = _text(selection.name, "selection filename")
-        if name in {".", ".."} or "/" in name or "\\" in name or any(ord(c) < 32 for c in name):
+        if name in {".", ".."} or "/" in name or "\\" in name or has_unsafe_character(name):
             raise ReportError("selection filename is not portable")
         selection_source = {"name": name, "sha256": _sha(selection_bytes)}
     with _open(archive) as tar:
@@ -462,6 +477,9 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
             if archived.size != record["size"]:
                 raise ReportError(f"{named} size differs from manifest.toml")
             records[path] = record
+        # the box's own facts are used, so they are checked like any file the report uses
+        if "box.toml" not in records:
+            raise ReportError("box.toml is not listed in manifest.toml")
 
         manifest_box = manifest.get("box")
         if not isinstance(manifest_box, dict):

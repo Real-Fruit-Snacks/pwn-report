@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import argparse
 import sys
-import unicodedata
 from pathlib import Path
 
 from . import __version__
 from .output import build_report
-from .report import ReportError
+from .report import ReportError, shown
 
 _SUFFIX = ".tar.gz"
 
@@ -52,7 +51,7 @@ def _say(text: str, stream) -> None:
     report already written is never reported as a failure because its path cannot be printed.
     A control or format character, which only a crafted name can bring, is shown as ?: a line
     break would split the line in two and an escape sequence would reach the terminal."""
-    text = "".join("?" if unicodedata.category(character) in {"Cc", "Cf"} else character for character in text)
+    text = shown(text)
     try:
         print(text, file=stream)
     except UnicodeEncodeError:

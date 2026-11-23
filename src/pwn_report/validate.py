@@ -9,7 +9,7 @@ from datetime import datetime
 
 from .report import (
     ALL_KINDS, DEFAULT_OMITTED, MAY_BE_EMPTY, METADATA, ReportError, _event_key, _evidence_location,
-    _leaves_the_box, held_back_group, is_portable, is_target_toml,
+    _leaves_the_box, has_unsafe_character, held_back_group, is_portable, is_target_toml,
 )  # fmt: skip
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -76,16 +76,9 @@ def _sha256(value, label: str) -> str:
 
 
 def _path(value, label: str) -> str:
+    # the reader's own rule, so the two cannot disagree
     _string(value, label)
-    parts = value.split("/")
-    if (
-        value.startswith("/")
-        or "\\" in value
-        or value.endswith("/")
-        or (len(value) >= 2 and value[0].isalpha() and value[1] == ":")
-        or any(part in {"", ".", ".."} for part in parts)
-        or any(ord(character) < 32 for character in value)
-    ):
+    if not is_portable(value):
         _fail(label, "must be a portable relative path")
     return value
 
@@ -172,7 +165,7 @@ def validate_model(model: dict) -> dict:
     if "selection" in provenance:
         selection = _object(provenance["selection"], "model.source.selection", {"name", "sha256"})
         name = _string(selection["name"], "model.source.selection.name")
-        if name in {".", ".."} or "/" in name or "\\" in name or any(ord(c) < 32 for c in name):
+        if name in {".", ".."} or "/" in name or "\\" in name or has_unsafe_character(name):
             _fail("model.source.selection.name", "must be a portable basename")
         _sha256(selection["sha256"], "model.source.selection.sha256")
 

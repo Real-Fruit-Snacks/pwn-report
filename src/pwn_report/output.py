@@ -16,7 +16,7 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, quote
 
 from . import __version__
-from .report import READ_BYTES, ReportError, _file_sha, _members, _open, build_model
+from .report import READ_BYTES, ReportError, _file_sha, _members, _open, build_model, shown
 from .validate import validate_model
 
 GENERATOR_VERSION = __version__
@@ -40,7 +40,8 @@ def _canonical_json(model: dict) -> bytes:
 
 
 def _toml_string(value: str) -> str:
-    return json.dumps(value, ensure_ascii=False)
+    # JSON's string escapes are TOML's too, except that JSON leaves DEL raw and TOML forbids it
+    return json.dumps(value, ensure_ascii=False).replace("\x7f", "\\u007f")
 
 
 def _metadata_toml(model: dict) -> bytes:
@@ -66,9 +67,9 @@ def _md_text(value: str) -> str:
     or format character (an escape sequence, a right-to-left override) is shown as ?, so
     reading report.md in a terminal cannot run one and a name cannot disguise itself."""
     value = value.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
-    value = "".join("?" if unicodedata.category(character) in {"Cc", "Cf"} else character for character in value)
+    value = shown(value)
     value = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    for character in ("\\", "`", "*", "_", "[", "]", "|"):
+    for character in ("\\", "`", "*", "_", "[", "]", "|", "~"):
         value = value.replace(character, "\\" + character)
     return value
 
@@ -221,6 +222,16 @@ def _unwritable(relatives: list[str], *, windows: bool, folds_case: bool) -> str
     and the characters <>:"|?*. A case-folding file system (Windows, macOS) holds two names
     that differ only in case, or only in Unicode form, as one: their files or folders would merge.
     """
+    files = set(relatives)
+    for relative in sorted(relatives):
+        parts = relative.split("/")
+        for depth in range(1, len(parts)):
+            folder = "/".join(parts[:depth])
+            if folder in files:
+                return (
+                    f"{_source_name(folder)} is a file and also the folder of {_source_name(relative)}, "
+                    f"which no file system can hold; {NEXT_STEP.split(', or ')[0]}"
+                )
     if windows:
         for relative in sorted(relatives):
             for part in relative.split("/"):
@@ -337,7 +348,7 @@ def _validate_staging(stage: Path, model: dict, files: dict[str, bytes], copied:
             raise ReportError(f"staged asset {relative} has the wrong checksum")
     _validate_links(stage, files["report.md"])
     sums = _output_path(stage, "SHA256SUMS").read_bytes().decode("utf-8")
-    rows = sums.splitlines()
+    rows = sums[:-1].split("\n") if sums.endswith("\n") else sums.split("\n")
     if not sums.endswith("\n") or len(rows) != len(expected) - 1:
         raise ReportError("SHA256SUMS is incomplete or lacks its final LF")
     seen = []

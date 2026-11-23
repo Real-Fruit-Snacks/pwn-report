@@ -7,7 +7,7 @@ from copy import deepcopy
 
 import pytest
 
-from pwn_report import build_model
+from pwn_report import ReportError, build_model
 
 from fixtures import LATER, make_archive, sha256, write_archive
 
@@ -51,12 +51,11 @@ def test_h04_archive_kind_does_not_impose_a_finished_time(tmp_path, kind, finish
     assert fixture.path.read_bytes() == original
 
 
-def test_h14_manifest_without_file_key_defaults_to_no_listed_files(tmp_path):
+def test_h14_manifest_without_file_key_is_refused_for_its_unlisted_box_toml(tmp_path):
+    # pwn-broker always lists box.toml; a manifest with no file rows lists nothing, so the box's own
+    # facts would be used unchecked
     source = make_archive(tmp_path / "source" / "source.tar.gz")
-    source_original = source.path.read_bytes()
     members = dict(source.members)
-
-    # Remove the entire top-level file collection while retaining manifest box data.
     head, remainder = source.manifest_bytes.split(b"[box]\n", 1)
     box_fields = remainder.split(b"\n[[file]]", 1)[0]
     manifest = head + b"[box]\n" + box_fields
@@ -64,18 +63,6 @@ def test_h14_manifest_without_file_key_defaults_to_no_listed_files(tmp_path):
     members["manifest.toml"] = manifest
     archive = write_archive(tmp_path / "without-file-key.tar.gz", members)
     original = archive.read_bytes()
-
-    expected = deepcopy(source.model)
-    expected["source"]["archive"]["sha256"] = sha256(original)
-    expected["source"]["manifest"]["sha256"] = sha256(manifest)
-    model = build_model(archive)
-
-    assert model == expected
-    assert model["flags"] == []
-    assert model["targets"] == []
-    assert model["timeline"] == []
-    assert model["evidence"] == []
-    assert model["findings"] == []
-    assert model["box"]["source"]["sha256"] == sha256(members["box.toml"])
+    with pytest.raises(ReportError, match="box.toml is not listed in manifest.toml"):
+        build_model(archive)
     assert archive.read_bytes() == original
-    assert source.path.read_bytes() == source_original

@@ -363,3 +363,76 @@ def test_an_interrupt_whose_staging_copy_cannot_be_removed_names_it(tmp_path, ca
     assert len(left) == 1
     err = capsys.readouterr().err
     assert err == f"fail  interrupted; a partial copy was left at {left[0]}: delete it, it holds copied evidence\n"
+
+
+
+@pytest.mark.parametrize("value", ["a\x7fb", "\x00\x1f", "a b", 'q"b\\s', "café"])
+def test_report_toml_strings_are_valid_toml(value):
+    import tomllib
+
+    from pwn_report import output
+
+    assert tomllib.loads("k = " + output._toml_string(value))["k"] == value
+
+
+@pytest.mark.parametrize("odd", ["a\x85b.txt", "a\x9bb.txt", "a b.txt", "a b.txt"])
+def test_names_with_a_c1_control_or_a_line_separator_are_other(tmp_path, odd):
+    path = f"targets/dc01/scans/{odd}"
+    archive = _with_listed(tmp_path, {path: b"ODD-NAME-CANARY"}, targets={path: "dc01"})
+    model = build_report(archive, tmp_path / "out")
+    assert path in model["other"] and path not in {item["path"] for item in model["evidence"]}
+    text = (tmp_path / "out" / "report.md").read_text(encoding="utf-8")
+    assert "- targets/dc01/scans/a?b.txt\n" in text
+    for data in (f.read_bytes() for f in (tmp_path / "out").rglob("*") if f.is_file()):
+        assert b"ODD-NAME-CANARY" not in data
+    assert not any(odd in f.name for f in (tmp_path / "out").rglob("*"))
+
+
+@pytest.mark.parametrize("odd", ["dir/sep x.txt", "dir/par x.txt", "dir/nel\x85x.txt"])
+def test_a_line_separator_never_splits_the_fail_line(tmp_path, capsys, odd):
+    base = make_archive(tmp_path / "b.tar.gz", full=True)
+    members = {p: d for p, d in base.members.items() if p != "manifest.toml"}
+    members["manifest.toml"] = manifest_bytes([*base.records, file_record(odd, b"x")], kind=base.kind)
+    bad = write_raw_archive(tmp_path / "bad.tar.gz", lambda tar: add_members(tar, members))
+    assert cli.main(["build", str(bad)]) == 1
+    err = capsys.readouterr().err
+    assert len(err.splitlines()) == 1 and "?" in err
+
+
+def test_box_toml_must_be_listed(tmp_path):
+    base = make_archive(tmp_path / "b.tar.gz", full=True)
+    members = {p: d for p, d in base.members.items() if p != "manifest.toml"}
+    records = [record for record in base.records if record.path != "box.toml"]
+    members["manifest.toml"] = manifest_bytes(records, kind=base.kind)
+    bad = write_raw_archive(tmp_path / "bad.tar.gz", lambda tar: add_members(tar, members))
+    with pytest.raises(ReportError, match="box.toml is not listed in manifest.toml"):
+        build_model(bad)
+
+
+def test_a_tilde_cannot_strike_text_through(tmp_path):
+    base = make_archive(tmp_path / "b.tar.gz", full=True)
+    selection = tmp_path / "pick.toml"
+    selection.write_text("schema = 1\n[[rule]]\npath = 'targets/dc01/scans/nmap.txt'\ncaption = '~~gone~~'\n", encoding="utf-8")
+    build_report(base.path, tmp_path / "out", selection)
+    text = (tmp_path / "out" / "report.md").read_text(encoding="utf-8")
+    assert "- Caption: \\~\\~gone\\~\\~\n" in text
+
+
+def test_a_file_and_a_folder_of_one_name_are_named_together():
+    from pwn_report import output
+
+    problem = output._unwritable(
+        ["evidence/targets/dc01/scans/collide", "evidence/targets/dc01/scans/collide/sub.txt"],
+        windows=False, folds_case=False,
+    )  # fmt: skip
+    assert problem is not None
+    assert "targets/dc01/scans/collide" in problem and "targets/dc01/scans/collide/sub.txt" in problem
+
+
+@pytest.mark.parametrize("value", ["a\x7fb", "a\x85b", "a b"])
+def test_the_validator_refuses_what_the_reader_refuses(value):
+    from pwn_report import report, validate
+
+    assert not report.is_portable(value)
+    with pytest.raises(ReportError):
+        validate._path(value, "path")
