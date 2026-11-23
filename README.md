@@ -2,15 +2,12 @@
 
 Private, evidence-linked reports from pwn-broker archives
 
-```sh
-pwn-report build ~/pwn-broker/wrapped/2026-11-01_htb_forest.finished.tar.gz
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/panel-dark.svg">
+  <img alt="A terminal in ~/pwn-broker/wrapped beside that folder. pwn-report build 2026-11-14_htb_forest.finished.tar.gz writes report.json, report.md and report.toml, then copies of notes.md, two screenshots, an exploit and a scan under evidence/, then SHA256SUMS, into a hidden folder beside the archive named .2026-11-14_htb_forest.finished.report.tmp- and a random end; the folder is renamed to 2026-11-14_htb_forest.finished.report, its files, grey while staged, all turn solid at once, and the command prints ok report 2026-11-14_htb_forest.finished.report. The same command again prints fail output already exists and will not be replaced, and the folder stays as it is. In the report, grep held report.md finds creds.toml, lists/, targets/dc01/creds/ and tooldata/, each held back, and report.md lights up in the folder" src="docs/assets/panel-light.svg" width="100%">
+</picture>
 
-[pwn-broker](https://github.com/Real-Fruit-Snacks/pwn-broker) keeps a box's targets, notes, credentials and files in order, and ends with one archive. pwn-report reads that archive and writes a report folder beside it: the box, its targets and flags, a timeline taken from the archive's own records, and an index of every scan, screenshot, exploit, loot file and recording, each with its SHA-256 and a link to its copy. It never runs anything from the archive, never contacts the network, and never changes the archive. The same archive gives the same report, byte for byte.
-
-I wanted the end of a box to leave something I can read and hand on, not only a tarball. The report is a draft and private: it states facts the archive records and links the files that prove them, and leaves the narrative to me.
-
-## Install
+<sub>Not a recording, and nothing typed by hand: `docs/art/make-panel.py` builds the full test archive from this repository's suite (box forest, target dc01, finished) in a folder of its own, runs this pwn-report on it there twice, and greps the report; every line and name on the panel comes from that run, and CI fails if the panel no longer matches it. The commands are typed as they would be in `~/pwn-broker/wrapped`. Left out: the random end of the hidden folder's name, and the speed: the build takes milliseconds, and is slowed here so each file can be seen.</sub>
 
 Python 3.11 or later, standard library only, on Linux, Windows or macOS. Each release has a wheel and its SHA-256 in `SHA256SUMS.txt`. On Kali, with `pipx` (`sudo apt install pipx`):
 
@@ -22,6 +19,10 @@ pipx install ./pwn_report-0.1.0-py3-none-any.whl
 ```
 
 Elsewhere, install the same wheel into a virtual environment with `python -m pip install pwn_report-0.1.0-py3-none-any.whl`. `pwn-report --version` prints `pwn-report 0.1.0`.
+
+[pwn-broker](https://github.com/Real-Fruit-Snacks/pwn-broker) keeps a box's targets, notes, credentials and files in order, and ends with one archive. pwn-report reads that archive and writes a report folder beside it: the box, its targets and flags, a timeline taken from the archive's own records, and an index of every scan, screenshot, exploit, loot file and recording, each with its SHA-256 and a link to its copy. It never runs anything from the archive, never contacts the network, and never changes the archive. The same archive gives the same report, byte for byte.
+
+I wanted the end of a box to leave something I can read and hand on, not only a tarball. The report is a draft and private: it states facts the archive records and links the files that prove them, and leaves the narrative to me.
 
 ## Use
 

@@ -76,6 +76,27 @@ jobs:
             exit 1
           fi
 
+  art:
+    # The README panel is drawn from a real build of the suite's full test archive; fail if
+    # docs/assets/panel-*.svg are not what docs/art/make-panel.py draws from this commit. The
+    # panel's tests run here too: the test jobs do not install fonttools, so there they skip.
+    name: README panel
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check the panel
+        run: |
+          python -m pip install --quiet -r docs/art/requirements.txt
+          python docs/art/make-panel.py --check
+      - name: The panel's tests
+        # pytest is not pinned, as in the test jobs: this job holds no token that can write
+        run: |
+          python -m pip install --quiet pytest
+          python -m pytest -q -W error tests/test_panel.py
+
   build:
     # The sdist and the wheel, built twice with the locked build tools to the same bytes; the
     # wheel checked to be pure and to hold pwn_report only, then installed into an empty

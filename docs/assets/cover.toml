@@ -1,0 +1,27 @@
+# Cover + social preview. Regenerate with Real-Fruit-Snacks/rfs-brand, from the folder holding both clones:
+#   python3 rfs-brand/tools/make-cover.py pwn-report/docs/assets/cover.toml
+# Layout v2 (BRAND.md section 7): name, rule, the README one-liner, and one panel.
+name        = "pwn-report"
+description = "Private, evidence-linked reports from pwn-broker archives"   # README line 1
+
+# What pwn-report does, as a flow: a pwn-broker archive goes in, a report folder comes out. The
+# names are ones in the suite's full test archive and in the report built from it, the run the
+# README panel shows. No status line: pwn-report's one line names the report folder, and that is
+# too long for the strip.
+[panel]
+kind = "flow"
+
+[panel.input]
+label = "pwn-broker archive"
+note  = "finished"
+chips = ["box.toml", "notes.md", "targets/"]
+tone  = "mute"
+
+[panel.tool]
+label = "pwn-report build"
+
+[panel.output]
+label = "report folder"
+note  = "private"
+chips = ["report.md", "evidence/"]
+tone  = "text"

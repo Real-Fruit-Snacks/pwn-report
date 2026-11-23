@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pwn-report: private, evidence-linked reports from pwn-broker archives</title>
+<meta name="description" content="Private, evidence-linked reports from pwn-broker archives">
+<link rel="canonical" href="https://real-fruit-snacks.github.io/pwn-report/">
+<meta property="og:title" content="pwn-report">
+<meta property="og:description" content="Private, evidence-linked reports from pwn-broker archives">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://real-fruit-snacks.github.io/pwn-report/">
+<meta property="og:image" content="https://real-fruit-snacks.github.io/pwn-report/assets/cover-dark.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="560">
+<meta property="og:image:alt" content="pwn-report: a finished pwn-broker archive goes through pwn-report build and comes out as a private report folder with report.md and evidence/.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0E1012">
+<link rel="preload" href="fonts/overpass-latin-900-normal.woff2" as="font" type="font/woff2" crossorigin>
+<script>
+    // A saved theme wins over the system setting; the key is shared with the other RFS pages.
+    // js-run hides the terminal's lines until script.js plays them (a CSS failsafe shows them after 6 s).
+    (function (d) {
+        try { var t = localStorage.getItem('rfs-theme'); if (t === 'nightshift' || t === 'dayshift') d.dataset.theme = t; } catch (e) {}
+        if (window.matchMedia && matchMedia('(prefers-reduced-motion: no-preference)').matches) d.classList.add('js-run');
+    })(document.documentElement);
+</script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="is-report">
+<a class="skip" href="#install">Skip to the install lines</a>
+
+<header class="wrap">
+    <div class="spine">
+        <a class="set" href="https://real-fruit-snacks.github.io/"><img src="icon.svg" alt="" width="26" height="26">Real-Fruit-Snacks</a>
+        <a class="gh" href="https://github.com/Real-Fruit-Snacks/pwn-report">GitHub</a>
+        <button class="theme" type="button" id="theme"><span class="sr-only">Theme: </span><span class="t-night">Night</span><span class="t-day">Day</span></button>
+    </div>
+    <nav aria-label="The pwn set">
+        <ul class="tabs">
+            <li><a class="t-broker" href="https://real-fruit-snacks.github.io/pwn-broker/">Broker<small>the box</small></a></li>
+            <li><a class="t-shop" href="https://real-fruit-snacks.github.io/pwn-shop/">Shop<small>its tools</small></a></li>
+            <li><a class="t-books" href="https://real-fruit-snacks.github.io/pwn-playbooks/">Playbooks<small>its notes</small></a></li>
+            <li><a class="t-report" href="./" aria-current="page">Report<small>its evidence</small></a></li>
+        </ul>
+    </nav>
+</header>
+
+<main class="wrap stack">
+<section class="card first" aria-labelledby="top-h">
+    <p class="runhead"><b>pwn-report 0.1.0</b><span>Python 3.11+ · standard library only</span><span>MIT</span></p>
+    <div class="hero">
+        <div>
+            <h1 class="title" id="top-h">pwn-report</h1>
+            <p class="lead">Private, evidence-linked reports from pwn-broker archives</p>
+            <p class="sub"><a href="https://real-fruit-snacks.github.io/pwn-broker/">pwn-broker</a> keeps a box's targets, notes, credentials and files in order, and ends with one archive. pwn-report reads that archive and writes a report folder beside it: the box, its targets and flags, a timeline taken from the archive's own records, and an index of every scan, screenshot, exploit, loot file and recording, each with its SHA-256 and a link to its copy. It never runs anything from the archive, never contacts the network, and never changes the archive.</p>
+            <ol class="ck steps" id="report-ck" aria-label="A report, built and checked">
+                <li id="install" data-state="todo"><span class="box" aria-hidden="true"></span><span class="ch">Install</span><span class="ld" aria-hidden="true"></span><span class="rs">With pipx</span>
+                    <div class="act"><div class="cmd"><pre><code>curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/pwn_report-0.1.0-py3-none-any.whl
+curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/SHA256SUMS.txt
+sha256sum -c --ignore-missing SHA256SUMS.txt
+pipx install ./pwn_report-0.1.0-py3-none-any.whl</code></pre><button class="copy" type="button" data-copy="curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/pwn_report-0.1.0-py3-none-any.whl&#10;curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/SHA256SUMS.txt&#10;sha256sum -c --ignore-missing SHA256SUMS.txt&#10;pipx install ./pwn_report-0.1.0-py3-none-any.whl">Copy</button></div></div>
+                    <p class="why">Python 3.11 or later, standard library only, on Linux, Windows or macOS. Each release has a wheel and its SHA-256 in <code>SHA256SUMS.txt</code>. On Kali, <code>pipx</code> comes from <code>sudo apt install pipx</code>. Elsewhere, install the same wheel into a virtual environment with <code>python -m pip install pwn_report-0.1.0-py3-none-any.whl</code>.</p></li>
+                <li data-step="2" data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">Build the report</span><span class="ld" aria-hidden="true"></span><span class="rs">Beside the archive</span></li>
+                <li data-step="3" data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">Build it again</span><span class="ld" aria-hidden="true"></span><span class="rs">Not replaced</span></li>
+                <li data-step="4" data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">Credential files</span><span class="ld" aria-hidden="true"></span><span class="rs">Held back</span></li>
+            </ol>
+            <p class="closeout">Report filed</p>
+        </div>
+
+        <figure class="display" aria-labelledby="session-cap">
+            <div class="screenbox">
+                <p class="bar" aria-hidden="true"><b>Session</b><span>~/pwn-broker/wrapped</span></p>
+<pre class="screen" id="screen" tabindex="0" aria-label="pwn-report building a report, refusing to build it again over the first, and grep in its report.md"><code><span class="ln"><span class="p">$</span> <span class="t">cd ~/pwn-broker/wrapped</span></span>
+<span class="ln"><span class="p">$</span> <span class="t">pwn-report build 2026-11-14_htb_forest.finished.tar.gz</span></span>
+<span class="ln s" data-step="2">ok    report 2026-11-14_htb_forest.finished.report</span>
+<span class="ln"><span class="p">$</span> <span class="t">pwn-report build 2026-11-14_htb_forest.finished.tar.gz</span></span>
+<span class="ln" data-step="3">fail  output already exists and will not be replaced: 2026-11-14_htb_forest.finished.report</span>
+<span class="ln"><span class="p">$</span> <span class="t">cd 2026-11-14_htb_forest.finished.report</span></span>
+<span class="ln"><span class="p">$</span> <span class="t">grep held report.md</span></span>
+<span class="ln o">- creds.toml: held back</span>
+<span class="ln o">- lists/: 1 file, held back</span>
+<span class="ln o">- targets/dc01/creds/: 1 file, held back</span>
+<span class="ln o" data-step="4">- tooldata/: 1 file, held back</span>
+<span class="ln end"><span class="p">$</span> <span class="cursor"></span></span></code></pre>
+            </div>
+            <figcaption>
+                <p class="cap" id="session-cap">One report, built, refused a second time, and searched. Not a recording, and nothing typed by hand: <code>docs/art/make-panel.py</code> builds the full test archive from pwn-report's suite (box forest, target dc01, finished) in a folder of its own and runs pwn-report 0.1.0 on it there; every line is what that run printed, or what <code>grep</code> finds in its <code>report.md</code>, and a test fails if this page and the run differ. The commands are typed as they would be in <code>~/pwn-broker/wrapped</code>.</p>
+                <button class="replay" type="button" data-replay="screen" hidden>Replay</button>
+            </figcaption>
+        </figure>
+    </div>
+</section>
+
+<section class="card ref" id="holds" aria-labelledby="holds-h">
+    <div class="holds">
+        <div>
+            <h2 id="holds-h">What a report holds</h2>
+            <p class="intro">The folder is made beside the archive and named after it, or wherever <code>-o</code> says. An existing folder is never replaced, so a report you have edited is safe. <code>report.md</code> has eight sections, in order: review status, box summary, targets, flags, timeline, evidence index, what is not in the index, and notes.</p>
+            <ul class="ck spec" aria-label="The report folder">
+                <li><span class="ch"><code>report.md</code></span><span class="ld" aria-hidden="true"></span><span class="rs">What to read</span></li>
+                <li><span class="ch"><code>report.json</code></span><span class="ld" aria-hidden="true"></span><span class="rs">As data</span>
+                    <p class="why">The same facts as data, with every source path and SHA-256.</p></li>
+                <li><span class="ch"><code>report.toml</code></span><span class="ld" aria-hidden="true"></span><span class="rs">What built it</span>
+                    <p class="why">Versions, the archive's SHA-256, and the selection's when one was given.</p></li>
+                <li><span class="ch"><code>SHA256SUMS</code></span><span class="ld" aria-hidden="true"></span><span class="rs">Every file</span>
+                    <p class="why">The SHA-256 of every other file in the folder.</p></li>
+                <li><span class="ch"><code>evidence/</code></span><span class="ld" aria-hidden="true"></span><span class="rs">The copies</span>
+                    <p class="why">Copies of the scans, screenshots, exploits and notes it links, at their paths inside the box.</p></li>
+            </ul>
+        </div>
+        <figure class="display" aria-labelledby="md-cap">
+            <div class="screenbox">
+                <p class="bar" aria-hidden="true"><b>report.md</b><span>cut short</span></p>
+<pre class="md-buf" id="md" tabindex="0" aria-labelledby="md-cap"><code><span class="h"># forest — private technical report</span>
+
+<span class="h">## Review status</span>
+
+**Draft / unreviewed.** No publication approval, severity rating, or finding validity is implied.
+
+It never reads `creds.toml`, `lists/`, `targets/*/creds/` or `tooldata/`. `notes.md` and copied scans are as they were and can hold passwords; keep this report private.
+
+<span class="eob">…</span>
+<span class="h">## Evidence index</span>
+<span class="eob">…</span>
+<span class="h">#### targets/dc01/loot/SAM.bak</span>
+
+- ID: ev\_bc7ee57343e110eba66f4bc729a64e1922dfec1ff6e1d624898b60f96569bd28
+- Target references: dc01
+- First seen: 2026-11-14T12:15:00+02:00
+- Size: 19 bytes
+- SHA-256: ec17298030b69ac95089102768c112ac3f399094b7aa9252aa56c62449c1b016
+- File: not copied; loot is indexed only unless a selection includes it
+<span class="eob">…</span>
+<span class="h">#### targets/dc01/scans/nmap.txt</span>
+
+- ID: ev\_ec11985e16f7360bc601b7335195e0ac6409fe3e386a3ebfc1ca74d1a53583f1
+- Target references: dc01
+- First seen: 2026-11-14T12:15:00+02:00
+- Size: 9 bytes
+- SHA-256: 0b28fdc685b67a63a58917a81879ddd8384a523803430462cf1ed620bdb9ca6d
+- File: [copied](evidence/targets/dc01/scans/nmap.txt)
+<span class="eob">…</span>
+<span class="h">## Not in the index</span>
+
+Held back, never read or copied:
+
+- creds.toml: held back
+- lists/: 1 file, held back
+- targets/dc01/creds/: 1 file, held back
+- tooldata/: 1 file, held back
+<span class="eob">…</span></code></pre>
+            </div>
+            <figcaption>
+                <p class="cap" id="md-cap"><code>report.md</code> from the session above, cut short where it shows <span aria-hidden="true">…</span><span class="sr-only">an ellipsis</span>: its title, the review status, two entries of the evidence index, one copied and one only indexed, and the places held back. The lines are the file's own, checked against the same run as the session.</p>
+            </figcaption>
+        </figure>
+    </div>
+</section>
+
+<section class="card ref" id="reads" aria-labelledby="reads-h">
+    <h2 id="reads-h">What it reads, and what it never does</h2>
+    <div class="cols">
+        <ul class="ck spec" aria-label="What it reads">
+            <li><span class="ch">Every listed file</span><span class="ld" aria-hidden="true"></span><span class="rs">Accounted for</span>
+                <p class="why">Scans, screenshots and exploits are indexed and copied. Loot, recordings and a target's <code>files/</code> and <code>upload/</code> are indexed and not copied unless a selection file includes them. Anything else is listed by its path under <code>Not in the index</code>.</p></li>
+            <li><span class="ch">Credentials</span><span class="ld" aria-hidden="true"></span><span class="rs">Stay out</span>
+                <p class="why">It never reads <code>creds.toml</code>, <code>lists/</code>, <code>targets/*/creds/</code> or <code>tooldata/</code>. <code>notes.md</code> and copied scans are as they were and can hold passwords; keep this report private. Each held-back place is named with its count of files, nothing more, and a selection file that names one is refused.</p></li>
+        </ul>
+        <ul class="ck spec" aria-label="What it never does">
+            <li><span class="ch">The archive</span><span class="ld" aria-hidden="true"></span><span class="rs">Checked, not trusted</span>
+                <p class="why">Every file the report uses has the size and SHA-256 the archive's manifest gives, or the build stops. Links, devices, paths that leave the box and archives past pwn-broker's own limits are refused before anything is read.</p></li>
+            <li><span class="ch">Running, the network</span><span class="ld" aria-hidden="true"></span><span class="rs">Never</span>
+                <p class="why">Archived files are read as bytes. There is no network code at all. The same archive gives the same report, byte for byte.</p></li>
+        </ul>
+    </div>
+</section>
+
+<section class="card ref" id="select" aria-labelledby="select-h">
+    <h2 id="select-h">Choosing what goes in</h2>
+    <p class="intro">A selection file adds captions and alt text and decides which indexed files are copied. Build with <code>pwn-report build &lt;archive&gt; --select selection.toml</code>. The <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/docs/guide.md#a-selection-file">guide</a> has every field, and <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/docs/selection.example.toml">docs/selection.example.toml</a> is a full one.</p>
+    <div class="cmd cmd-block"><pre><code>schema = 1
+
+[[rule]]
+path = "targets/dc01/loot/ntds.dit"
+include = true
+caption = "NTDS.dit copied off DC01 with the backup operator's rights"</code></pre><button class="copy" type="button" data-copy="schema = 1&#10;&#10;[[rule]]&#10;path = &quot;targets/dc01/loot/ntds.dit&quot;&#10;include = true&#10;caption = &quot;NTDS.dit copied off DC01 with the backup operator's rights&quot;">Copy</button></div>
+</section>
+
+<section class="card ref" id="tested" aria-labelledby="tested-h">
+    <h2 id="tested-h">Tested on</h2>
+    <p class="intro">The checks on the left passed; the two on the right have not been run yet. The full record, with counts, versions and dates, is in <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/docs/tested.md">docs/tested.md</a>.</p>
+    <div class="cols">
+        <ul class="ck" aria-label="Checks run">
+            <li data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">The unit suite</span><span class="ld" aria-hidden="true"></span><span class="rs">Passed</span>
+                <p class="why">On Windows 11 under Python 3.13, with warnings treated as errors and the network blocked in every test.</p></li>
+            <li data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">Archives pwn-broker made</span><span class="ld" aria-hidden="true"></span><span class="rs">Passed</span>
+                <p class="why">Made by pwn-broker 0.1.11's own code: a box with no targets and nothing typed at its os and difficulty, and a full box exported and finished. Each report builds twice to identical bytes, with no byte of a held-back file in it.</p></li>
+            <li data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">A release, built twice</span><span class="ld" aria-hidden="true"></span><span class="rs">Same bytes</span>
+                <p class="why">With the locked build tools, two builds of the same commit gave the same sdist and wheel, and the wheel check accepted the wheel.</p></li>
+        </ul>
+        <ul class="ck" aria-label="Checks not run yet">
+            <li data-state="no"><span class="box" aria-hidden="true"></span><span class="ch">CI</span><span class="ld" aria-hidden="true"></span><span class="rs">Not run</span>
+                <p class="why">Linux with Python 3.11 to 3.14, and Windows and macOS: the workflows exist and run on the first push.</p></li>
+            <li data-state="no"><span class="box" aria-hidden="true"></span><span class="ch">Kali by hand</span><span class="ld" aria-hidden="true"></span><span class="rs">Not run</span>
+                <p class="why">As a normal user.</p></li>
+        </ul>
+    </div>
+</section>
+
+<section class="card ref limits" id="issues" aria-labelledby="issues-h">
+    <h2 id="issues-h">Known issues</h2>
+    <ul class="plain">
+        <li>A private report by design: there is no public writeup mode, no redaction of notes or scans, and no secret scanning. Read <a href="#reads">what it reads</a> before sharing one.</li>
+        <li>No findings, severities or narrative: the report states what the archive records.</li>
+        <li>On Windows, a path longer than 260 characters fails with the system's own message.</li>
+        <li>Files in the archive that its manifest does not list leave no trace in the report. pwn-broker lists every file except its own bookkeeping, and warns about any whose name is not UTF-8.</li>
+    </ul>
+</section>
+</main>
+
+<footer class="wrap foot">
+    <p>MIT. Not affiliated with Hack The Box.</p>
+    <p><a href="https://github.com/Real-Fruit-Snacks/pwn-report">Source</a> · <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/docs/guide.md">Guide</a> · <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/SECURITY.md">Security</a> · <a href="https://real-fruit-snacks.github.io/">RFS</a></p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
