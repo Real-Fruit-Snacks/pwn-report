@@ -292,9 +292,7 @@ def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
             copied_sizes[relative] = item["size"]
     if "notes" in model:
         copied[model["notes"]["report_path"]] = "notes.md"
-        copied_sizes[model["notes"]["report_path"]] = next(
-            record_size for record_size in [_member_size(archive, "notes.md")]
-        )
+        copied_sizes[model["notes"]["report_path"]] = model["notes"]["size"]
 
     required = _required_bytes(files, copied_sizes)
     free = shutil.disk_usage(output.parent).free
@@ -308,10 +306,14 @@ def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
             _output_path(stage, relative).write_bytes(data)
         with _open(archive) as tar:
             root, members = _members(tar)
-            for relative, source_path in sorted(copied.items()):
+            wanted = []
+            for relative, source_path in copied.items():
                 member = members.get(f"{root}/{source_path}")
                 if member is None:
                     raise ReportError(f"{source_path} disappeared before evidence copying")
+                wanted.append((member.offset_data, relative, source_path, member))
+            # archive order, so the gzip stream is only read forwards
+            for _offset, relative, source_path, member in sorted(wanted, key=lambda row: (row[0], row[1])):
                 expected_hash = model["notes"]["source"]["sha256"] if source_path == "notes.md" else next(
                     item["sha256"] for item in model["evidence"] if item["source"]["path"] == source_path
                 )
@@ -337,16 +339,6 @@ def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
     finally:
         if stage is not None:
             shutil.rmtree(stage, ignore_errors=True)
-
-
-def _member_size(archive: Path, path: str) -> int:
-    """Read only a required listed member's header to account for output space."""
-    with _open(archive) as tar:
-        root, members = _members(tar)
-        member = members.get(f"{root}/{path}")
-        if member is None or not member.isreg():
-            raise ReportError(f"{path} is missing before output space accounting")
-        return member.size
 
 
 def build_report(

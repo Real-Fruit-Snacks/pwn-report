@@ -385,6 +385,7 @@ def _expected_model(
         model["notes"] = {
             "source": _source(members, "notes.md"),
             "report_path": "evidence/notes.md",
+            "size": len(members["notes.md"]),
         }
     return model
 

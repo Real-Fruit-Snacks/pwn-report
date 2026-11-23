@@ -448,7 +448,8 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
         if "manifest.toml" in records:
             used.add("manifest.toml")
 
-        for path in sorted(used):
+        # archive order: a .tar.gz read backwards decompresses again from its start
+        for path in sorted(used, key=lambda name: member(name).offset_data):
             if path not in hashes:
                 hashes[path] = _member_sha(tar, member(path), path)
             if path in records and hashes[path] != records[path]["sha256"]:
@@ -476,7 +477,7 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
             )
 
         targets = []
-        for path in sorted(target_paths):
+        for path in sorted(target_paths, key=lambda name: member(name).offset_data):
             target_bytes = _member_bytes(tar, member(path), MAX_SMALL_TOML_BYTES, path)
             data = _toml(target_bytes, path)
             _schema(data.get("schema"), f"{path} schema")
@@ -575,6 +576,7 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
             model["notes"] = {
                 "source": _source("notes.md", hashes["notes.md"]),
                 "report_path": "evidence/notes.md",
+                "size": records["notes.md"]["size"],
             }
         if selection_source is not None:
             model["source"]["selection"] = selection_source

@@ -343,7 +343,8 @@ def validate_model(model: dict) -> dict:
     if not isinstance(model["findings"], list) or model["findings"]:
         _fail("model.findings", "must be an empty array in schema version 1")
     if "notes" in model:
-        notes = _object(model["notes"], "model.notes", {"source", "report_path"})
+        notes = _object(model["notes"], "model.notes", {"source", "report_path", "size"})
+        _integer(notes["size"], "model.notes.size", minimum=0)
         source = _source(notes["source"], "model.notes.source")
         if source["path"] != "notes.md":
             _fail("model.notes.source.path", "must be 'notes.md'")

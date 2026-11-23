@@ -174,6 +174,7 @@ def test_h02_full_exported_fixture_and_golden_model(tmp_path):
     assert model["notes"] == {
         "source": _source(first, "notes.md"),
         "report_path": "evidence/notes.md",
+        "size": len(first.members["notes.md"]),
     }
 
     policies = {
