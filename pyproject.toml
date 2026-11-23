@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "pwn-report"
 dynamic = ["version"]
 description = "Private, evidence-linked reports from pwn-broker archives"
+readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Real-Fruit-Snacks" }]
@@ -44,9 +45,14 @@ packages = ["src/pwn_report"]
 include = [
   "src/pwn_report",
   "tests",
+  # the suite reads the documents and the wheel check, so an sdist can run its own tests
+  "docs",
+  "release",
   "LICENSE",
   "README.md",
   "CHANGELOG.md",
+  "SECURITY.md",
+  "CONTRIBUTING.md",
   "pyproject.toml",
   "pytest.ini",
 ]

@@ -1,0 +1,22 @@
+# A selection file for `pwn-report build <archive> --select selection.toml`.
+# Every rule names one file in the evidence index by its path inside the box.
+
+schema = 1
+
+# Loot is indexed but not copied by default; this copies one file and says what it is.
+[[rule]]
+path = "targets/dc01/loot/ntds.dit"
+include = true
+caption = "NTDS.dit copied off DC01 with the backup operator's rights"
+
+# Scans are copied by default; this one is large and not needed in the report.
+[[rule]]
+path = "targets/dc01/scans/nmap-full.txt"
+include = false
+
+# A screenshot with a caption and alt text, which concerns a second target too.
+[[rule]]
+path = "targets/dc01/screenshots/bloodhound.png"
+caption = "The path from svc-alfresco to Domain Admins"
+alt_text = "BloodHound graph: svc-alfresco, Account Operators, Exchange Windows Permissions, the domain"
+target_refs = ["dc02"]
