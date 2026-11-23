@@ -333,7 +333,9 @@ def _validate_links(stage: Path, markdown: bytes) -> None:
             raise ReportError(f"rendered link {encoded!r} does not resolve to a copied file")
 
 
-def _validate_staging(stage: Path, model: dict, files: dict[str, bytes], copied: dict[str, str]) -> None:
+def _validate_staging(
+    stage: Path, model: dict, files: dict[str, bytes], copied: dict[str, str], sha_by_path: dict[str, str]
+) -> None:
     expected = set(files) | set(copied) | {"SHA256SUMS"}
     actual = {
         path.relative_to(stage).as_posix()
@@ -349,9 +351,7 @@ def _validate_staging(stage: Path, model: dict, files: dict[str, bytes], copied:
         copied_path = _output_path(stage, relative)
         if not copied_path.is_file() or copied_path.is_symlink():
             raise ReportError(f"staged asset {relative} is not a regular file")
-        expected_hash = model["notes"]["source"]["sha256"] if source_path == "notes.md" else next(
-            item["sha256"] for item in model["evidence"] if item["source"]["path"] == source_path
-        )
+        expected_hash = sha_by_path[source_path]
         if _file_sha(copied_path) != expected_hash:
             raise ReportError(f"staged asset {relative} has the wrong checksum")
     _validate_links(stage, files["report.md"])
@@ -384,6 +384,11 @@ def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
         raise ReportError(problem)
 
     model = validate_model(build_model(archive, selection))
+    # each copied file's SHA-256 by its path, made once: a walk of all the evidence per file
+    # made the build grow with the square of the files copied
+    sha_by_path = {item["source"]["path"]: item["sha256"] for item in model["evidence"]}
+    if "notes" in model:
+        sha_by_path["notes.md"] = model["notes"]["source"]["sha256"]
     files = {
         "report.json": _canonical_json(model),
         "report.md": _render_markdown(model),
@@ -427,9 +432,7 @@ def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
                 wanted.append((member.offset_data, relative, source_path, member))
             # archive order, so the gzip stream is only read forwards
             for _offset, relative, source_path, member in sorted(wanted, key=lambda row: (row[0], row[1])):
-                expected_hash = model["notes"]["source"]["sha256"] if source_path == "notes.md" else next(
-                    item["sha256"] for item in model["evidence"] if item["source"]["path"] == source_path
-                )
+                expected_hash = sha_by_path[source_path]
                 _copy_member(
                     tar,
                     member,
@@ -439,7 +442,7 @@ def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
                     label=source_path,
                 )
         _output_path(stage, "SHA256SUMS").write_bytes(_checksum_bytes(files, set(copied), stage))
-        _validate_staging(stage, model, files, copied)
+        _validate_staging(stage, model, files, copied, sha_by_path)
         if _file_sha(archive) != model["source"]["archive"]["sha256"]:
             raise ReportError("source archive changed during report generation")
         if selection is not None and _file_sha(selection) != model["source"]["selection"]["sha256"]:

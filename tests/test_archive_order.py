@@ -91,3 +91,33 @@ def test_the_model_records_the_notes_size(tmp_path):
     fixture = make_archive(tmp_path / "a.tar.gz", full=True)
     model = build_model(fixture.path)
     assert model["notes"]["size"] == len(fixture.members["notes.md"])
+
+
+
+def test_the_evidence_list_is_walked_a_fixed_number_of_times(tmp_path, monkeypatch):
+    # finding each copied file's SHA-256 by walking all the evidence made the build grow with the
+    # square of the files copied: 30,000 took a minute, 60,000 nearly five
+    from pwn_report import output
+
+    walks = []
+
+    class Counted(list):
+        def __iter__(self):
+            walks.append(1)
+            return super().__iter__()
+
+    real_build_model = output.build_model
+
+    def counted_model(*args, **kwargs):
+        model = real_build_model(*args, **kwargs)
+        model["evidence"] = Counted(model["evidence"])
+        return model
+
+    monkeypatch.setattr(output, "build_model", counted_model)
+    counts = []
+    for count in (5, 60):
+        archive = _reversed_archive(tmp_path, count)
+        walks.clear()
+        build_report(archive, tmp_path / f"out-{count}")
+        counts.append(len(walks))
+    assert counts[0] == counts[1], counts
