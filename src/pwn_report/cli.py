@@ -46,8 +46,18 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _say(text: str, stream) -> None:
+    """One line, whatever the stream's encoding: a character it cannot hold is escaped, so a
+    report already written is never reported as a failure because its path cannot be printed."""
+    try:
+        print(text, file=stream)
+    except UnicodeEncodeError:
+        encoding = getattr(stream, "encoding", None) or "ascii"
+        print(text.encode(encoding, "backslashreplace").decode(encoding), file=stream)
+
+
 def _fail(message: str) -> int:
-    print(f"fail  {message}", file=sys.stderr)
+    _say(f"fail  {message}", sys.stderr)
     return 1
 
 
@@ -63,12 +73,12 @@ def main(argv: list[str] | None = None) -> int:
         build_report(archive, output, args.select)
     except KeyboardInterrupt:
         # build_report removes its staging folder on the way out, so nothing is left behind
-        print("fail  interrupted; no report was written", file=sys.stderr)
+        _say("fail  interrupted; no report was written", sys.stderr)
         return 130
     except (ReportError, OSError) as exc:
         return _fail(str(exc))
     except Exception as exc:
         # a bug must still end in one line, not a traceback, for whoever runs this command
         return _fail(f"unexpected error: {type(exc).__name__}: {exc}")
-    print(f"ok    report {output}")
+    _say(f"ok    report {output}", sys.stdout)
     return 0

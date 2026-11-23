@@ -235,3 +235,48 @@ def test_a_case_clash_fails_before_anything_is_written(tmp_path):
         build_report(archive, tmp_path / "out")
     assert not (tmp_path / "out").exists()
     assert not list(tmp_path.glob(".out.tmp-*"))
+
+
+
+def test_a_staging_copy_that_cannot_be_removed_is_named(tmp_path, monkeypatch):
+    from pwn_report import output
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+
+    def failing(*args, **kwargs):
+        raise ReportError("checked and wrong")
+
+    monkeypatch.setattr(output, "_validate_staging", failing)
+    monkeypatch.setattr(output.shutil, "rmtree", lambda *args, **kwargs: None)
+    with pytest.raises(ReportError) as raised:
+        build_report(fixture.path, tmp_path / "out")
+    left = list(tmp_path.glob(".out.tmp-*"))
+    assert len(left) == 1
+    message = str(raised.value)
+    assert message.startswith("checked and wrong; ")
+    assert f"a partial copy was left at {left[0]}" in message and "delete it" in message
+
+
+def test_the_ok_line_survives_an_encoding_that_cannot_hold_the_path(tmp_path, monkeypatch):
+    import io
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    out_dir = tmp_path / "café"
+    raw = io.BytesIO()
+    stream = io.TextIOWrapper(raw, encoding="ascii", newline="\n")
+    monkeypatch.setattr(sys, "stdout", stream)
+    assert cli.main(["build", str(fixture.path), "-o", str(out_dir)]) == 0
+    stream.flush()
+    line = raw.getvalue().decode("ascii")
+    assert line.startswith("ok    report ") and line.endswith("caf\\xe9\n")
+    assert (out_dir / "report.md").is_file()
+
+
+def test_each_evidence_heading_is_its_path(tmp_path):
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    model = build_report(fixture.path, tmp_path / "out")
+    text = (tmp_path / "out" / "report.md").read_text(encoding="utf-8")
+    scan = next(item for item in model["evidence"] if item["path"] == "targets/dc01/scans/nmap.txt")
+    block = text[text.index("#### targets/dc01/scans/nmap.txt\n"):]
+    assert block.split("\n")[2] == f"- ID: {scan['id'].replace('_', chr(92) + '_')}"
+    assert "#### ev" not in text and "- Path: " not in text

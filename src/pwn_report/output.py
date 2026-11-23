@@ -148,9 +148,9 @@ def _render_markdown(model: dict) -> bytes:
             output = item["output"]
             lines.extend(
                 (
-                    f"#### {_md_text(item['id'])}",
+                    f"#### {_md_text(item['path'])}",
                     "",
-                    f"- Path: {_md_text(item['path'])}",
+                    f"- ID: {_md_text(item['id'])}",
                     f"- Target references: {_md_text(', '.join(item['target_refs']) or 'None')}",
                     f"- First seen: {_md_text(item['first_seen'])}",
                     f"- Size: {item['size']} bytes",
@@ -410,11 +410,24 @@ def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
         if os.path.lexists(output):
             raise ReportError(f"output appeared during generation and will not be replaced: {output}")
         stage.rename(output)
-        stage = None
         return model
-    finally:
-        if stage is not None:
-            shutil.rmtree(stage, ignore_errors=True)
+    except Exception as exc:
+        # the staging folder holds copied evidence and the notes: one that cannot be removed is
+        # named, never left behind in silence
+        if _remove_stage(stage):
+            raise ReportError(
+                f"{exc}; a partial copy was left at {stage}: delete it, it holds copied evidence"
+            ) from exc
+        raise
+    except BaseException:
+        _remove_stage(stage)
+        raise
+
+
+def _remove_stage(stage: Path) -> bool:
+    """Remove the staging folder; True if any of it is still there."""
+    shutil.rmtree(stage, ignore_errors=True)
+    return os.path.lexists(stage)
 
 
 def build_report(
