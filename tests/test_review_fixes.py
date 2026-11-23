@@ -280,3 +280,53 @@ def test_each_evidence_heading_is_its_path(tmp_path):
     block = text[text.index("#### targets/dc01/scans/nmap.txt\n"):]
     assert block.split("\n")[2] == f"- ID: {scan['id'].replace('_', chr(92) + '_')}"
     assert "#### ev" not in text and "- Path: " not in text
+
+
+
+def _entry(text: str, path: str) -> list[str]:
+    """The lines of one evidence entry in report.md, from its heading to the next blank line."""
+    escaped = path.replace("_", "\\_")
+    start = text.index(f"#### {escaped}\n")
+    return text[start:].split("\n\n", 2)[1].split("\n")
+
+
+def test_each_entry_says_in_words_what_happened_to_its_file(tmp_path):
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    selection = tmp_path / "pick.toml"
+    selection.write_text(
+        "schema = 1\n"
+        "[[rule]]\npath = 'targets/dc01/loot/SAM.bak'\ninclude = true\n"
+        "[[rule]]\npath = 'targets/dc01/exploits/poc.py'\ninclude = false\n",
+        encoding="utf-8",
+    )
+    build_report(fixture.path, tmp_path / "out", selection)
+    text = (tmp_path / "out" / "report.md").read_text(encoding="utf-8")
+    assert "- Decision: " not in text
+    expect = {
+        "targets/dc01/scans/nmap.txt": "- File: [copied](evidence/targets/dc01/scans/nmap.txt)",
+        "targets/dc01/loot/SAM.bak": "- File: [copied](evidence/targets/dc01/loot/SAM.bak), as the selection asks",
+        "targets/dc01/exploits/poc.py": "- File: not copied; the selection leaves it out",
+        "targets/dc01/recordings/session.cast": "- File: not copied; recordings are indexed only unless a selection includes them",
+        "targets/dc01/files/notes.txt": "- File: not copied; files/ is indexed only unless a selection includes it",
+        "targets/dc01/upload/winpeas.exe": "- File: not copied; upload/ is indexed only unless a selection includes it",
+    }
+    for path, line in expect.items():
+        assert line in _entry(text, path), (path, _entry(text, path))
+
+
+def test_loot_left_out_by_default_says_so(tmp_path):
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    build_report(fixture.path, tmp_path / "out")
+    text = (tmp_path / "out" / "report.md").read_text(encoding="utf-8")
+    assert "- File: not copied; loot is indexed only unless a selection includes it" in _entry(
+        text, "targets/dc01/loot/SAM.bak"
+    )
+
+
+def test_the_timeline_names_files_by_path_alone(tmp_path):
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    build_report(fixture.path, tmp_path / "out")
+    text = (tmp_path / "out" / "report.md").read_text(encoding="utf-8")
+    timeline = text[text.index("## Timeline\n"):text.index("## Evidence index\n")]
+    assert "File first seen: targets/dc01/scans/nmap.txt\n" in timeline
+    assert "ev\\_" not in timeline

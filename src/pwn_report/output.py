@@ -77,6 +77,25 @@ def _md_link(path: str) -> str:
     return quote(path, safe="/", encoding="utf-8", errors="strict")
 
 
+# what report.md says for each reason report.json records; the codes stay in report.json
+_LEFT_OUT = {
+    "default-exclude-loot": "loot is indexed only unless a selection includes it",
+    "default-exclude-recording": "recordings are indexed only unless a selection includes them",
+    "default-exclude-files": "files/ is indexed only unless a selection includes it",
+    "default-exclude-upload": "upload/ is indexed only unless a selection includes it",
+    "selection-exclude": "the selection leaves it out",
+}
+
+
+def _file_line(output: dict) -> str:
+    # the link text is fixed: an archived name inside a link's brackets could hide the link from
+    # _validate_links, and the entry's heading already names the file
+    if output["copied"]:
+        link = f"[copied]({_md_link(output['path'])})"
+        return f"{link}, as the selection asks" if output["reason"] == "selection-include" else link
+    return f"not copied; {_LEFT_OUT[output['reason']]}"
+
+
 def _render_markdown(model: dict) -> bytes:
     box = model["box"]
     lines = [
@@ -133,7 +152,7 @@ def _render_markdown(model: dict) -> bytes:
             detail = f"Flag recorded: {_md_text(event['flag'])}"
         else:
             item = evidence_by_id[event["evidence_id"]]
-            detail = f"File first seen: {_md_text(item['path'])} ({_md_text(item['id'])})"
+            detail = f"File first seen: {_md_text(item['path'])}"
         lines.append(f"- {at} — {detail}")
 
     lines.extend(("", "## Evidence index", ""))
@@ -155,13 +174,9 @@ def _render_markdown(model: dict) -> bytes:
                     f"- First seen: {_md_text(item['first_seen'])}",
                     f"- Size: {item['size']} bytes",
                     f"- SHA-256: {_md_text(item['sha256'])}",
-                    f"- Decision: {_md_text(output['reason'])}",
                 )
             )
-            if output["copied"]:
-                lines.append(f"- File: [Open copied evidence]({_md_link(output['path'])})")
-            else:
-                lines.append("- File: Indexed only; not copied by the evidence policy.")
+            lines.append(f"- File: {_file_line(output)}")
             if "caption" in item:
                 lines.append(f"- Caption: {_md_text(item['caption'])}")
             if "alt_text" in item:
