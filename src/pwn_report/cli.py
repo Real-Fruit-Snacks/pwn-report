@@ -67,5 +67,8 @@ def main(argv: list[str] | None = None) -> int:
         return 130
     except (ReportError, OSError) as exc:
         return _fail(str(exc))
+    except Exception as exc:
+        # a bug must still end in one line, not a traceback, for whoever runs this command
+        return _fail(f"unexpected error: {type(exc).__name__}: {exc}")
     print(f"ok    report {output}")
     return 0

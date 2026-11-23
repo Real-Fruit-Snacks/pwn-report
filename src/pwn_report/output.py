@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import tarfile
+import zlib
 import tempfile
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, quote
@@ -379,5 +380,10 @@ def build_report(
         return _build_report(archive_path, output_path, selection_path)
     except ReportError:
         raise
-    except (OSError, EOFError, tarfile.TarError, ValueError, TypeError, UnicodeError, RecursionError) as exc:
+    # zlib.error comes through raw when the deflate stream breaks inside a member's data, and
+    # OverflowError from a time that has no UTC instant
+    except (
+        OSError, EOFError, tarfile.TarError, zlib.error, ValueError, TypeError, UnicodeError,
+        RecursionError, OverflowError,
+    ) as exc:  # fmt: skip
         raise ReportError(f"{output_path}: cannot build report: {exc}") from exc
