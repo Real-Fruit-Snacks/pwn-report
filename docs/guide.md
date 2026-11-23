@@ -60,7 +60,7 @@ A build always prints exactly one line, and a control or format character from a
 7. **Not in the index**: the places held back, with how many files each holds, and every other listed file, by path.
 8. **Notes**: a link to the box's `notes.md`, copied unchanged.
 
-Every string from the archive is shown as text: Markdown, HTML and template syntax in a file name, a caption or a flag value is escaped, and a control or format character, such as a terminal escape or a right-to-left override, is shown as `?`.
+Every string from the archive is shown as text: Markdown and HTML in a file name, a caption or a flag value are escaped, template syntax such as `{{ }}` is left as plain text and never evaluated, and a control or format character, or a line or paragraph separator, such as a terminal escape or a right-to-left override, is shown as `?`.
 
 `report.toml` holds `generator`, `generator_version`, `schema_version`, `profile`, `box_id`, `archive_kind`, `source_archive_sha256`, `selection_sha256` when a selection was given, and `status`. `SHA256SUMS` has one `<sha256>  <path>` line for each file in the folder but itself, sorted by path, with a final newline.
 
@@ -90,7 +90,7 @@ An evidence ID is `ev_` and the SHA-256 of the box's ID, the file's path and its
 |---|---|
 | `scans/`, `screenshots/` and `exploits/`, in a target or at the box's root | indexed and copied |
 | `loot/` and `recordings/`, in a target or at the box's root | indexed; copied only when a selection includes the file |
-| `targets/<t>/files/`, `upload/` | indexed; copied only when a selection includes the file |
+| `files/` and `upload/` in a target | indexed; copied only when a selection includes the file |
 | `creds.toml`, `lists/`, `targets/<t>/creds/`, `tooldata/` | held back: never read or copied, never selectable, shown only as a count of files |
 | `box.toml`, `notes.md`, `manifest.toml`, `targets/<t>/target.toml` | read for the report itself; `notes.md` is copied |
 | anything else the manifest lists | shown by path under `Not in the index`, never read |

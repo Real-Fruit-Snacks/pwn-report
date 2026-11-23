@@ -51,7 +51,8 @@ With the locked build tools, two builds of the same commit gave the same sdist a
 - No findings, severities or narrative: schema 1's `findings` is always empty.
 - On Windows, a path longer than 260 characters fails with the system's own message.
 - Files in the archive that its manifest does not list leave no trace in the report.
-- There is no limit on the size of a file copied or hashed beyond the free space checked before writing: a box with a capture of many gigabytes in `scans/` takes as long as reading it takes. A selection rule can leave it out.
+- There is no limit on the size of a file copied or hashed beyond the free space checked before writing: a box with a capture of many gigabytes in `scans/` takes as long as reading it takes. A selection rule leaves such a file out of the copy, but it is still read once to check its SHA-256.
+- An archive is read as long as it takes to decompress, the members its manifest does not list included: a crafted one that decompresses to many gigabytes costs that time. A crafted manifest at its 64 MiB limit can take over a GiB of memory to parse. Both limits are pwn-broker's own.
 - On Linux, another process that makes an empty folder at the output path between the last check and the rename would have it replaced, and the staged files are not flushed to disk before the rename.
 - A URL in a caption or a file name stays a URL in `report.md`, and some Markdown viewers make it a link.
 
