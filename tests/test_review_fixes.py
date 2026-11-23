@@ -982,3 +982,51 @@ def test_a_stop_while_a_failed_build_is_cleaned_up_names_a_copy_it_cannot_remove
     monkeypatch.undo()
     for left in tmp_path.glob(".out.tmp-*"):
         shutil.rmtree(left)
+
+
+def test_a_report_another_run_puts_at_the_output_is_not_taken_for_this_one(tmp_path, capsys, monkeypatch):
+    # another run wrote a whole report where this one was going: this build refuses to replace
+    # it, and a stop during its cleanup must not report that other folder as written by it
+    import shutil
+    import signal
+
+    from pwn_report import output
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    real_rmtree = shutil.rmtree
+
+    def other_run(*args, **kwargs):
+        (tmp_path / "out").mkdir()
+        (tmp_path / "out" / "SHA256SUMS").write_bytes(b"")
+        (tmp_path / "out" / "report.toml").write_bytes(b"")
+
+    def rmtree(*args, **kwargs):
+        signal.raise_signal(signal.SIGINT)
+        return real_rmtree(*args, **kwargs)
+
+    monkeypatch.setattr(output, "_validate_staging", other_run)
+    monkeypatch.setattr(output.shutil, "rmtree", rmtree)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == "fail  interrupted; no report was written\n"
+    assert not list(tmp_path.glob(".out.tmp-*"))
+
+
+def test_a_stop_before_a_handler_is_put_back_still_puts_it_back(tmp_path, capsys, monkeypatch, own_handlers):
+    # CPython mostly raises a pending stop before the call that sets the handler runs
+    import signal
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    real = signal.signal
+    fired = []
+
+    def setting(number, handler):
+        if handler is _sentinel and not fired:
+            fired.append(number)
+            raise KeyboardInterrupt
+        return real(number, handler)
+
+    monkeypatch.setattr(cli.signal, "signal", setting)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 0
+    assert capsys.readouterr().out == f"ok    report {tmp_path / 'out'}\n"
+    assert fired and [signal.getsignal(n) for n in _stop_signals()] == [_sentinel] * len(_stop_signals())

@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .output import build_report
+from .output import Interrupted, build_report
 from .report import ReportError, shown
 
 _SUFFIX = ".tar.gz"
@@ -88,8 +88,10 @@ def main(argv: list[str] | None = None) -> int:
             # one that raises out of main with a traceback
             _put_back(previous)
     except KeyboardInterrupt as exc:
+        # a stop the build handled wrote no report of its own; only one that landed outside it,
+        # as build_report returned, can find this build's report in place
         left = getattr(exc, "left", None)
-        if left is not None or existed or not _is_report(output):
+        if isinstance(exc, Interrupted) or existed or not _is_report(output):
             # build_report removes its staging folder on the way out; one it could not remove is named
             if left is not None:
                 _say(f"fail  interrupted; a partial copy was left at {left}: delete it, it holds copied evidence", sys.stderr)
@@ -141,9 +143,10 @@ def _stop_on_signals(previous: dict) -> None:
 
 
 def _put_back(previous: dict) -> None:
-    """Put the caller's handlers back. A stop that lands meanwhile is let go, and the rest are put
-    back all the same: the build is over, so it has nothing left to stop, and the line about the
-    build, the one naming a staging copy left behind included, still has to be printed."""
+    """Put the caller's handlers back. A stop that lands meanwhile is let go, each handler is tried
+    up to three times, and the rest are put back all the same: the build is over, so it has
+    nothing left to stop, and the line about the build, the one naming a staging copy left behind
+    included, still has to be printed."""
     for number, handler in previous.items():
         for _attempt in range(3):
             try:

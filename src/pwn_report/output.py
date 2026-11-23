@@ -461,19 +461,22 @@ def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
             ) from exc
         raise
     except BaseException as exc:
-        if isinstance(exc, KeyboardInterrupt) and not os.path.lexists(stage) and os.path.isdir(output):
+        if not isinstance(exc, KeyboardInterrupt):
+            _remove_stage(stage)
+            raise
+        if not os.path.lexists(stage) and os.path.isdir(output):
             # the stop landed between the rename and the return: the report is whole and in place
             return model
-        if _remove_stage(stage) and isinstance(exc, KeyboardInterrupt):
-            raise Interrupted(stage) from exc
-        raise
+        left = _remove_stage(stage)
+        raise Interrupted(stage if left else None) from exc
 
 
 class Interrupted(KeyboardInterrupt):
-    """Ctrl-C during a build whose staging folder could not be removed: `left` names it."""
+    """A stop that the build handled: no report was written by it. `left` names its staging folder
+    when that could not be removed, and is None when it was."""
 
-    def __init__(self, left: Path) -> None:
-        super().__init__(str(left))
+    def __init__(self, left: Path | None) -> None:
+        super().__init__(str(left) if left is not None else "")
         self.left = left
 
 
@@ -492,9 +495,7 @@ def _remove_stage(stage: Path) -> bool:
         except KeyboardInterrupt as exc:
             stopped = exc
     if stopped is not None:
-        if left:
-            raise Interrupted(stage) from stopped
-        raise stopped
+        raise Interrupted(stage if left else None) from stopped
     return left
 
 
