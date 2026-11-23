@@ -254,10 +254,18 @@ def _member_sha(tar: tarfile.TarFile, member: tarfile.TarInfo, label: str) -> st
 
 
 def _entry_label(name: str) -> str:
-    """How an error names a member: by its name, or, inside a held-back place, by that place."""
-    root, _, rest = name.partition("/")
-    group = held_back_group(rest) if rest else None
-    return f"in {root}/{group}" if group else repr(name)
+    """How an error names a member: by its name, or, inside a held-back place, by that place. The
+    name is read as the place it spells, by either slash, with empty and . parts dropped and ..
+    taken back, so no spelling of lists/ or creds/ gets the name of a file inside one printed."""
+    parts: list[str] = []
+    for part in name.replace("\\", "/").split("/"):
+        if part == "..":
+            if parts:
+                parts.pop()
+        elif part not in {"", "."}:
+            parts.append(part)
+    group = held_back_group("/".join(parts[1:])) if len(parts) > 1 else None
+    return f"in {parts[0]}/{group}" if group else repr(name)
 
 
 def _check_member(member: tarfile.TarInfo) -> None:
@@ -557,8 +565,9 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
 
         # archive order: a .tar.gz read backwards decompresses again from its start
         target_bytes: dict[str, bytes] = {}
+        is_target = set(target_paths)
         for path in sorted(used, key=lambda name: member(name).offset_data):
-            if path in target_paths:
+            if path in is_target:
                 # read here, in archive order: a pass of its own went back to the first target's
                 target_bytes[path] = _member_bytes(tar, member(path), MAX_SMALL_TOML_BYTES, path)
                 hashes[path] = _sha(target_bytes[path])

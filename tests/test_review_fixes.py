@@ -532,3 +532,37 @@ def test_the_report_folder_is_its_owners_alone(tmp_path):
     fixture = make_archive(tmp_path / "a.tar.gz", full=True)
     build_report(fixture.path, tmp_path / "out")
     assert stat.S_IMODE((tmp_path / "out").stat().st_mode) == 0o700
+
+
+@pytest.mark.parametrize(
+    "spelled",
+    [
+        "{box}/lists//SECRET-INNER-NAME",
+        "{box}/lists/./SECRET-INNER-NAME",
+        "./{box}/lists/SECRET-INNER-NAME",
+        "{box}/scans/../lists/SECRET-INNER-NAME",
+        "{box}/targets/dc01//creds/SECRET-INNER-NAME",
+        "{box}\\tooldata\\SECRET-INNER-NAME",
+    ],
+)
+def test_an_odd_spelling_of_a_held_back_place_is_still_named_by_the_place(tmp_path, spelled):
+    # a member name is never used as a path, so these are only names; but an error about one names
+    # the place it spells, never the file inside it
+    import tarfile
+
+    base = make_archive(tmp_path / "b.tar.gz", full=True)
+    name = spelled.format(box=BOX_ID)
+
+    def write(tar):
+        add_members(tar, dict(base.members))
+        info = tarfile.TarInfo(name)
+        info.type = tarfile.SYMTYPE
+        info.linkname = "x"
+        tar.addfile(info)
+
+    bad = write_raw_archive(tmp_path / "bad.tar.gz", write)
+    with pytest.raises(ReportError) as raised:
+        build_model(bad)
+    message = str(raised.value)
+    assert "SECRET-INNER-NAME" not in message, message
+    assert any(place in message for place in ("lists/", "tooldata/", "targets/dc01/creds/")), message
