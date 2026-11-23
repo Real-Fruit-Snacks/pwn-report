@@ -140,6 +140,7 @@ caption = "NTDS.dit copied off DC01 with the backup operator's rights"
 ## Tested on
 
 - The unit suite on Windows 11 under Python 3.13, with warnings treated as errors, including reports from archives made by pwn-broker 0.1.11's own code: a box with no targets and nothing typed at its os and difficulty, and a full box exported and finished
+- The same suite in Kali Rolling under WSL 2 with Python 3.14, as a normal user, with the README panel's tests and the cleanup on SIGTERM and SIGHUP
 
 [docs/tested.md](docs/tested.md) is the full record: counts, versions, dates, what each run checked, and what has not been run.
 

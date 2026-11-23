@@ -4,8 +4,8 @@ Everything pwn-report has been run on, with the counts, versions and dates, and 
 
 ## Unit tests
 
-- On Windows 11 with Python 3.13, the development machine, on 2026-11-23: 348 passed, 3 skipped, with warnings treated as errors and the pwn-broker compatibility tests included; without a pwn-broker checkout those 9 skip too. The 3 that skip are the README panel's, which need fonttools.
-- In Kali Rolling under WSL 2, with Python 3.14.7, as a normal user, on 2026-11-23: 349 passed, 2 skipped, with the pwn-broker compatibility tests against pwn-broker 0.1.11 and the panel's tests. The 2 that skip only mean something on Windows and macOS: a backslash as a path separator, and two names that differ only in case.
+- On Windows 11 with Python 3.13, the development machine, on 2026-11-23: 387 passed, 6 skipped, with warnings treated as errors and the pwn-broker compatibility tests included; without a pwn-broker checkout those 9 skip too. Of the 6 that skip, 3 are the README panel's, which need fonttools, and 3 only mean something on Linux and macOS: SIGTERM, SIGHUP and a folder's mode.
+- In Kali Rolling under WSL 2, with Python 3.14.7, as a normal user, on 2026-11-23: 389 passed, 4 skipped, with the pwn-broker compatibility tests against pwn-broker 0.1.11 and the panel's tests. The 4 that skip only mean something on Windows and macOS: a backslash as a path separator, two names that differ only in case, and two report folder names Windows refuses.
 - Every test blocks the network: `socket`, `http.client` and `urllib` raise if anything reaches them.
 - Only synthetic archives, built in the tests with canary values in every file that must not reach a report: credentials, held-back files, loot, recordings, files the manifest does not list, and extra metadata. Each test that writes a report checks that none of them is in any of its files.
 
@@ -41,6 +41,20 @@ A second review, of the whole repository before its first release, found and cha
 - The privacy line named notes and scans, but exploits and screenshots are copied too, and a selection can copy loot; it now says every copied file.
 - A crafted name in a `fail` line could break it in two or carry a terminal escape; control and format characters in a status line are shown as `?`.
 
+A third review, of the release candidate, found and changed:
+
+- SIGTERM, which pwn-broker's timeout sends, and SIGHUP, from a closed terminal or SSH session, ended a build at once and left its staging copy of the evidence behind; they now clean up as Ctrl-C does.
+- A Ctrl-C whose staging copy could not be removed said no report was written and nothing more; the line now names the copy.
+- C1 control characters and line and paragraph separators were not treated as unsafe, so one in a name could split a `fail` line or reach `report.md`; they are shown as `?`, and such a file is listed under `Not in the index`. A DEL character in a value made `report.toml` invalid TOML; it is escaped.
+- A manifest that did not list `box.toml` was accepted; it is refused.
+- A `~` in a name could strike text through in `report.md`; it is escaped.
+- A file and a folder of the same name in the copy failed while writing; they stop the build before anything is written, naming both.
+- A report folder name Windows refuses, such as `CON`, was not checked; it is refused by name before anything is made.
+- A link or a duplicated entry inside `lists/`, `tooldata/` or a target's `creds/` was named by the file inside it; it is named by that place.
+- With more than one target, building the model decompressed the archive a third time to read each `target.toml`; it reads them in the checksum pass. Looking up each copied file's SHA-256 walked the whole evidence list, a cost that grew with the square of the number of files; it is one lookup.
+- The release workflow published a tag whose changelog heading still said `(unreleased)`, and the wheel check accepted a member named twice; both are refused. The panel's CI job would have passed had its tests skipped, and the panel script put this checkout's `src/` ahead of an installed pwn-report; the job now fails on a skip, and the script uses `src/` only when nothing is installed.
+- A one-byte file was shown as `1 bytes`.
+
 ## Building a release
 
 With the locked build tools, two builds of the same commit gave the same sdist and wheel, byte for byte, and `release/check_wheel.py` accepted the wheel. Every workflow parses and passes `actionlint`.
@@ -50,6 +64,7 @@ With the locked build tools, two builds of the same commit gave the same sdist a
 - A private report by design: there is no public writeup mode, no redaction of notes or scans, and no secret scanning.
 - No findings, severities or narrative: schema 1's `findings` is always empty.
 - On Windows, a path longer than 260 characters fails with the system's own message.
+- On Windows, a build ended from outside, by Task Manager or `taskkill /f`, runs no cleanup, so its hidden `.<name>.tmp-*` folder is left beside the output with the evidence copied so far. Ctrl-C cleans up.
 - Files in the archive that its manifest does not list leave no trace in the report.
 - There is no limit on the size of a file copied or hashed beyond the free space checked before writing: a box with a capture of many gigabytes in `scans/` takes as long as reading it takes. A selection rule leaves such a file out of the copy, but it is still read once to check its SHA-256.
 - An archive is read as long as it takes to decompress, the members its manifest does not list included: a crafted one that decompresses to many gigabytes costs that time. A crafted manifest at its 64 MiB limit can take over a GiB of memory to parse. Both limits are pwn-broker's own.
