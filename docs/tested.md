@@ -4,7 +4,8 @@ Everything pwn-report has been run on, with the counts, versions and dates, and 
 
 ## Unit tests
 
-- On Windows 11 with Python 3.13, the development machine, on 2026-11-23: 326 passed with warnings treated as errors, the pwn-broker compatibility tests included. Without a pwn-broker checkout those 9 skip.
+- On Windows 11 with Python 3.13, the development machine, on 2026-11-23: 348 passed, 3 skipped, with warnings treated as errors and the pwn-broker compatibility tests included; without a pwn-broker checkout those 9 skip too. The 3 that skip are the README panel's, which need fonttools.
+- In Kali Rolling under WSL 2, with Python 3.14.7, as a normal user, on 2026-11-23: 349 passed, 2 skipped, with the pwn-broker compatibility tests against pwn-broker 0.1.11 and the panel's tests. The 2 that skip only mean something on Windows and macOS: a backslash as a path separator, and two names that differ only in case.
 - Every test blocks the network: `socket`, `http.client` and `urllib` raise if anything reaches them.
 - Only synthetic archives, built in the tests with canary values in every file that must not reach a report: credentials, held-back files, loot, recordings, files the manifest does not list, and extra metadata. Each test that writes a report checks that none of them is in any of its files.
 
@@ -13,7 +14,7 @@ Everything pwn-report has been run on, with the counts, versions and dates, and 
 `tests/broker/make_archives.py` makes archives with pwn-broker's own code, the way its prompt does: `create_box` and `add_target`, the box's note, `flag user`, `flag root` and `cred add` through its command dispatcher, a file in every folder a tool or the user would write to, then `export_box` and `finish_box`. On 2026-11-23, against pwn-broker 0.1.11:
 
 - A box with no targets and nothing typed at its os and difficulty, finished: the report builds, and both read `Not recorded`.
-- A full box, exported and then finished, on the night the clocks go back: each report builds twice to identical bytes, its timeline is in order by instant across the change of offset, every kind of evidence is indexed, the flags and the target are there, and `creds.toml`, `lists/`, `targets/dc01/creds/` and `tooldata/` are held back with no byte of their contents in any file.
+- A full box, exported and then finished, worked across the night the clocks go back, so its times are at -04:00 before 06:00 UTC and at -05:00 after: each report builds twice to identical bytes, its timeline holds both offsets in an order that sorting the text would get wrong, and is in order by instant, every kind of evidence is indexed, the flags and the target are there, and `creds.toml`, `lists/`, `targets/dc01/creds/` and `tooldata/` are held back with no byte of their contents in any file.
 - Run against the code as it was before the fixes below, the same tests failed 6 of 9, starting with `box.toml os must be a nonempty string`: the code had only ever been tested on its own fixtures.
 
 ## Review
@@ -32,6 +33,13 @@ The code was reviewed against its design and pwn-broker's archive code. What it 
 - An error about a held-back file named the file inside the folder; it names the folder.
 - The timeline was ordered by its text, so a box that crossed a change of clock could be out of order; it is ordered by instant.
 - Each file was read back from the start of the gzip stream when the archive was not in path order; members are read in archive order.
+
+A second review, of the whole repository before its first release, found and changed:
+
+- CI's pwn-broker job piped the tests through `tee` without `pipefail`, so a failing test could not fail it; every step now runs under bash with `pipefail`.
+- The pwn-broker box's times were all at one offset, so the clock-change test against it could not fail; the box now crosses the change.
+- The privacy line named notes and scans, but exploits and screenshots are copied too, and a selection can copy loot; it now says every copied file.
+- A crafted name in a `fail` line could break it in two or carry a terminal escape; control and format characters in a status line are shown as `?`.
 
 ## Building a release
 
