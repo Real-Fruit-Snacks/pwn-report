@@ -20,6 +20,8 @@ pipx install ./pwn_report-0.1.0-py3-none-any.whl
 
 Elsewhere, install the same wheel into a virtual environment with `python -m pip install pwn_report-0.1.0-py3-none-any.whl`. `pwn-report --version` prints `pwn-report 0.1.0`.
 
+In a [pwn-broker](https://github.com/Real-Fruit-Snacks/pwn-broker) box there is nothing to install by hand: `tool install report` gets this release from [pwn-shop](https://github.com/Real-Fruit-Snacks/pwn-shop), and from pwn-broker 0.1.12 `finish` builds the report beside the finished archive by itself, before it takes the tools off. The first new box asks once whether new boxes get it.
+
 [pwn-broker](https://github.com/Real-Fruit-Snacks/pwn-broker) keeps a box's targets, notes, credentials and files in order, and ends with one archive. pwn-report reads that archive and writes a report folder beside it: the box, its targets and flags, a timeline taken from the archive's own records, and an index of every scan, screenshot, exploit, loot file and recording, each with its SHA-256 and a link to its copy. It never runs anything from the archive, never contacts the network, and never changes the archive. The same archive gives the same report, byte for byte.
 
 I wanted the end of a box to leave something I can read and hand on, not only a tarball. The report is a draft and private: it states facts the archive records and links the files that prove them, and leaves the narrative to me.

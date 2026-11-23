@@ -13,6 +13,8 @@ pipx install ./pwn_report-0.1.0-py3-none-any.whl
 
 On Kali, `pipx` comes from `sudo apt install pipx`; Kali's Python refuses a plain `pip install` outside a virtual environment. On Windows or macOS, make a virtual environment and run `python -m pip install pwn_report-0.1.0-py3-none-any.whl` in it. From a checkout, `python -m pip install .`.
 
+In a pwn-broker box, `tool install report` installs this release from pwn-shop's `report` package, on pwn-shop's own Python 3.13, and `finish` takes it off again. From pwn-broker 0.1.12, `finish` runs `pwn-report build` on the finished archive by itself, before the tools come off, and puts the report beside it as `<archive minus .tar.gz>.report`, or `.report-2` beside an earlier one. A report that fails is a warning there, and the finish goes on.
+
 `SHA256SUMS.txt` comes from the same release as the wheel, so the check catches a damaged download, not a release replaced by someone else. The release workflow builds both files from a locked set of build tools, records their SHA-256 before anything unpinned runs, and publishes only files with those SHA-256; [docs/tested.md](tested.md) records each release's run.
 
 ## The command
