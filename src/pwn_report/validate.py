@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 import re
 from datetime import datetime
 
-from .report import EVIDENCE_KINDS, MAY_BE_EMPTY, ReportError, _evidence_location
+from .report import EVIDENCE_KINDS, MAY_BE_EMPTY, ReportError, _event_key, _evidence_location
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _EVIDENCE_ID = re.compile(r"^ev_[0-9a-f]{64}$")
@@ -115,10 +114,6 @@ def _strings(value, label: str, *, unique: bool = True, nonempty: bool = False) 
     if unique and len(set(value)) != len(value):
         _fail(label, "must not contain duplicates")
     return value
-
-
-def _compact(value: dict) -> bytes:
-    return json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 def _evidence_id(box_id: str, path: str, digest: str) -> str:
@@ -310,7 +305,7 @@ def validate_model(model: dict) -> dict:
         {"at": item["first_seen"], "kind": "file_first_seen", "evidence_id": item["id"], "source": item["source"]}
         for item in evidence
     )
-    expected_timeline.sort(key=lambda event: (event["at"], event["kind"], _compact(event)))
+    expected_timeline.sort(key=_event_key)
     timeline = model["timeline"]
     if not isinstance(timeline, list):
         _fail("model.timeline", "must be an array")

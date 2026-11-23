@@ -14,7 +14,7 @@ import os
 import tarfile
 import tomllib
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 SCHEMA_VERSION = 1
@@ -294,6 +294,13 @@ def _compact_json(value: dict) -> bytes:
     return json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
+def _event_key(event: dict) -> tuple:
+    """Order by the instant an event happened: as text, 01:10-05:00 would sort before the
+    earlier 01:30-04:00 on the night the clocks go back. Ties keep a fixed, total order."""
+    instant = datetime.fromisoformat(event["at"].replace("Z", "+00:00")).astimezone(timezone.utc)
+    return (instant, event["at"], event["kind"], _compact_json(event))
+
+
 def _string_list(value, label: str) -> list[str]:
     if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
         raise ReportError(f"{label} must be a list of strings")
@@ -547,7 +554,7 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
             }
             for item in evidence
         )
-        timeline.sort(key=lambda event: (event["at"], event["kind"], _compact_json(event)))
+        timeline.sort(key=_event_key)
 
         model = {
             "schema_version": SCHEMA_VERSION,

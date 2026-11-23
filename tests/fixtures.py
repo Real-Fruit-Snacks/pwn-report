@@ -353,7 +353,14 @@ def _expected_model(
         }
         for item in evidence
     )
-    timeline.sort(key=lambda event: (event["at"], event["kind"], _compact_json(event)))
+    timeline.sort(
+        key=lambda event: (
+            datetime.fromisoformat(event["at"]).astimezone(timezone.utc),
+            event["at"],
+            event["kind"],
+            _compact_json(event),
+        )
+    )
 
     model = {
         "schema_version": 1,
