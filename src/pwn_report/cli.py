@@ -75,9 +75,13 @@ def main(argv: list[str] | None = None) -> int:
     output = args.output if args.output is not None else default_output(archive)
     try:
         build_report(archive, output, args.select)
-    except KeyboardInterrupt:
-        # build_report removes its staging folder on the way out, so nothing is left behind
-        _say("fail  interrupted; no report was written", sys.stderr)
+    except KeyboardInterrupt as exc:
+        # build_report removes its staging folder on the way out; one it could not remove is named
+        left = getattr(exc, "left", None)
+        if left is not None:
+            _say(f"fail  interrupted; a partial copy was left at {left}: delete it, it holds copied evidence", sys.stderr)
+        else:
+            _say("fail  interrupted; no report was written", sys.stderr)
         return 130
     except (ReportError, OSError) as exc:
         return _fail(str(exc))

@@ -434,9 +434,18 @@ def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
                 f"{exc}; a partial copy was left at {stage}: delete it, it holds copied evidence"
             ) from exc
         raise
-    except BaseException:
-        _remove_stage(stage)
+    except BaseException as exc:
+        if _remove_stage(stage) and isinstance(exc, KeyboardInterrupt):
+            raise Interrupted(stage) from exc
         raise
+
+
+class Interrupted(KeyboardInterrupt):
+    """Ctrl-C during a build whose staging folder could not be removed: `left` names it."""
+
+    def __init__(self, left: Path) -> None:
+        super().__init__(str(left))
+        self.left = left
 
 
 def _remove_stage(stage: Path) -> bool:

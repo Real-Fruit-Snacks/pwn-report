@@ -345,3 +345,21 @@ def test_the_fail_line_is_one_line_with_no_control_or_format_character(tmp_path,
     err = capsys.readouterr().err
     assert err.startswith("fail  ") and err.count("\n") == 1 and err.endswith("\n")
     assert "\x1b" not in err and "‮" not in err and "?" in err
+
+
+
+def test_an_interrupt_whose_staging_copy_cannot_be_removed_names_it(tmp_path, capsys, monkeypatch):
+    from pwn_report import output
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+
+    def interrupted(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(output, "_validate_staging", interrupted)
+    monkeypatch.setattr(output.shutil, "rmtree", lambda *args, **kwargs: None)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
+    left = list(tmp_path.glob(".out.tmp-*"))
+    assert len(left) == 1
+    err = capsys.readouterr().err
+    assert err == f"fail  interrupted; a partial copy was left at {left[0]}: delete it, it holds copied evidence\n"
