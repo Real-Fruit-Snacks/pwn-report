@@ -8,7 +8,7 @@ import math
 import re
 from datetime import datetime
 
-from .report import EVIDENCE_KINDS, ReportError, _evidence_location
+from .report import EVIDENCE_KINDS, MAY_BE_EMPTY, ReportError, _evidence_location
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _EVIDENCE_ID = re.compile(r"^ev_[0-9a-f]{64}$")
@@ -150,7 +150,7 @@ def validate_model(model: dict) -> dict:
         {"finished"},
     )
     for field in ("id", "name", "platform", "os", "difficulty", "status"):
-        _string(box[field], f"model.box.{field}")
+        _string(box[field], f"model.box.{field}", empty=field in MAY_BE_EMPTY)
     _datetime(box["started"], "model.box.started")
     if "finished" in box:
         _datetime(box["finished"], "model.box.finished")

@@ -29,6 +29,8 @@ ENTRY_HEADER_BYTES = 16 * 1024
 HEADER_ROOM = 2048
 HEADER_LINES = 16
 EVIDENCE_KINDS = frozenset({"scans", "loot", "screenshots", "recordings", "exploits"})
+# pwn-broker stores a new box's os and difficulty as typed, so pressing Enter leaves them empty
+MAY_BE_EMPTY = frozenset({"os", "difficulty"})
 
 
 class ReportError(Exception):
@@ -401,7 +403,7 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
             raise ReportError("manifest.toml box must be a table")
         box = {}
         for field in ("id", "name", "platform", "os", "difficulty", "status"):
-            box[field] = _text(box_data.get(field), f"box.toml {field}")
+            box[field] = _text(box_data.get(field), f"box.toml {field}", empty=field in MAY_BE_EMPTY)
         box["started"] = _time(box_data.get("started"), "box.toml started")
         if "finished" in box_data:
             box["finished"] = _time(box_data["finished"], "box.toml finished")
@@ -411,7 +413,7 @@ def _build_model(archive: Path, selection: Path | None) -> dict:
             ):
                 raise ReportError(f"manifest.toml box {field} differs from box.toml")
         for field in ("id", "name", "platform", "os", "difficulty"):
-            _text(manifest_box.get(field), f"manifest.toml box {field}")
+            _text(manifest_box.get(field), f"manifest.toml box {field}", empty=field in MAY_BE_EMPTY)
 
         used = {"box.toml"}
         target_paths = []

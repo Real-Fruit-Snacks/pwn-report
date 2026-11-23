@@ -75,8 +75,8 @@ def _render_markdown(model: dict) -> bytes:
         "",
         f"- Name: {_md_text(box['name'])}",
         f"- Platform: {_md_text(box['platform'])}",
-        f"- OS: {_md_text(box['os'])}",
-        f"- Difficulty: {_md_text(box['difficulty'])}",
+        f"- OS: {_md_text(box['os'] or 'Not recorded')}",
+        f"- Difficulty: {_md_text(box['difficulty'] or 'Not recorded')}",
         f"- Status: {_md_text(box['status'])}",
         f"- Started: {_md_text(box['started'])}",
     ]

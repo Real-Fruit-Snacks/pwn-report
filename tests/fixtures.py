@@ -31,6 +31,8 @@ POC = b'raise RuntimeError("ARCHIVE_CODE_EXECUTED")\n'
 UNLISTED_CANARY = b"UNLISTED-CONTENT-CANARY"
 CREDS_CANARY = b"CRED-ROOT-CANARY"
 LISTS_CANARY = b"LIST-CONTENT-CANARY"
+# the box fields make_archive can override, as pwn-broker writes them by default
+BOX_FIELDS = {"name": "forest", "platform": "htb", "os": "windows", "difficulty": "easy"}
 
 
 @dataclass(frozen=True)
@@ -140,14 +142,22 @@ def _toml_value(value) -> str:
     raise TypeError(f"unsupported fixture TOML value: {type(value).__name__}")
 
 
-def _box_toml(*, full: bool, finished: datetime | None) -> bytes:
+def _box_fields(box: dict[str, str] | None) -> dict[str, str]:
+    unknown = set(box or {}) - set(BOX_FIELDS)
+    if unknown:
+        raise ValueError(f"make_archive cannot override {sorted(unknown)}")
+    return {**BOX_FIELDS, **(box or {})}
+
+
+def _box_lines(fields: dict[str, str]) -> list[str]:
+    return [f"{key} = {_toml_value(fields[key])}" for key in ("name", "platform", "os", "difficulty")]
+
+
+def _box_toml(*, full: bool, finished: datetime | None, box: dict[str, str] | None = None) -> bytes:
     lines = [
         "schema = 1",
         f"id = {_toml_value(BOX_ID)}",
-        'name = "forest"',
-        'platform = "htb"',
-        'os = "windows"',
-        'difficulty = "easy"',
+        *_box_lines(_box_fields(box)),
         'status = "active"',
         f"started = {_toml_value(NOW)}",
     ]
@@ -169,11 +179,11 @@ def _box_toml(*, full: bool, finished: datetime | None) -> bytes:
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-def _target_toml() -> bytes:
+def _target_toml(box_name: str = "forest") -> bytes:
     lines = [
         "schema = 1",
         f"box_id = {_toml_value(BOX_ID)}",
-        'box = "forest"',
+        f"box = {_toml_value(box_name)}",
         'name = "dc01"',
         'ips = ["10.10.10.161"]',
         'hostnames = ["forest.htb.local"]',
@@ -183,7 +193,9 @@ def _target_toml() -> bytes:
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-def _manifest_toml(records: list[FileRecord], *, kind: str, finished: datetime | None) -> bytes:
+def _manifest_toml(
+    records: list[FileRecord], *, kind: str, finished: datetime | None, box: dict[str, str] | None = None
+) -> bytes:
     lines = [
         "schema = 1",
         f"kind = {_toml_value(kind)}",
@@ -191,10 +203,7 @@ def _manifest_toml(records: list[FileRecord], *, kind: str, finished: datetime |
         "",
         "[box]",
         f"id = {_toml_value(BOX_ID)}",
-        'name = "forest"',
-        'platform = "htb"',
-        'os = "windows"',
-        'difficulty = "easy"',
+        *_box_lines(_box_fields(box)),
         f"started = {_toml_value(NOW)}",
     ]
     if finished is not None:
@@ -240,13 +249,12 @@ def _expected_model(
     kind: str,
     finished: datetime | None,
     archive_sha256: str,
+    box_fields: dict[str, str] | None = None,
 ) -> dict:
+    fields = _box_fields(box_fields)
     box = {
         "id": BOX_ID,
-        "name": "forest",
-        "platform": "htb",
-        "os": "windows",
-        "difficulty": "easy",
+        **fields,
         "status": "active",
         "started": NOW.isoformat(),
         "source": _source(members, "box.toml"),
@@ -277,7 +285,7 @@ def _expected_model(
         targets = [
             {
                 "box_id": BOX_ID,
-                "box": "forest",
+                "box": fields["name"],
                 "name": "dc01",
                 "ips": ["10.10.10.161"],
                 "hostnames": ["forest.htb.local"],
@@ -374,9 +382,11 @@ def _expected_model(
     return model
 
 
-def manifest_bytes(records, *, kind: str = "exported", finished: datetime | None = None) -> bytes:
+def manifest_bytes(
+    records, *, kind: str = "exported", finished: datetime | None = None, box: dict[str, str] | None = None
+) -> bytes:
     """Serialize records for mutation tests without importing a TOML writer."""
-    return _manifest_toml(list(records), kind=kind, finished=finished)
+    return _manifest_toml(list(records), kind=kind, finished=finished, box=box)
 
 
 def write_raw_archive(destination: Path, write) -> Path:
@@ -409,13 +419,20 @@ def write_archive(destination: Path, members: dict[str, bytes]) -> Path:
     return write_raw_archive(destination, lambda tar: add_members(tar, members))
 
 
-def make_archive(destination: Path, *, full: bool = False, kind: str = "exported", finished: datetime | None = None) -> ArchiveFixture:
+def make_archive(
+    destination: Path,
+    *,
+    full: bool = False,
+    kind: str = "exported",
+    finished: datetime | None = None,
+    box: dict[str, str] | None = None,
+) -> ArchiveFixture:
     """Write one deterministic synthetic archive and return its golden model."""
-    members = {"box.toml": _box_toml(full=full, finished=finished)}
+    members = {"box.toml": _box_toml(full=full, finished=finished, box=box)}
     if full:
         members.update(
             {
-                "targets/dc01/target.toml": _target_toml(),
+                "targets/dc01/target.toml": _target_toml(_box_fields(box)["name"]),
                 "notes.md": NOTES,
                 "targets/dc01/scans/nmap.txt": b"SYN scan\n",
                 "targets/dc01/screenshots/proof.png": b"\x89PNG\r\n\x1a\nSYNTHETIC",
@@ -442,7 +459,7 @@ def make_archive(destination: Path, *, full: bool = False, kind: str = "exported
                 "lists/passwords.txt": LISTS_CANARY,
             }
         )
-    members["manifest.toml"] = manifest_bytes(records, kind=kind, finished=finished)
+    members["manifest.toml"] = manifest_bytes(records, kind=kind, finished=finished, box=box)
     write_archive(destination, members)
 
     model = _expected_model(
@@ -452,5 +469,6 @@ def make_archive(destination: Path, *, full: bool = False, kind: str = "exported
         kind=kind,
         finished=finished,
         archive_sha256=sha256(destination.read_bytes()),
+        box_fields=box,
     )
     return ArchiveFixture(destination, kind, members, tuple(records), model)
