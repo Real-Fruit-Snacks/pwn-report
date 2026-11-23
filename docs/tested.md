@@ -43,16 +43,17 @@ A second review, of the whole repository before its first release, found and cha
 
 A third review, of the release candidate, found and changed:
 
-- SIGTERM, which pwn-broker's timeout sends, and SIGHUP, from a closed terminal or SSH session, ended a build at once and left its staging copy of the evidence behind; they now clean up as Ctrl-C does.
+- SIGTERM, which pwn-broker's timeout sends, and SIGHUP, from a closed terminal or SSH session, ended a build at once and left its staging copy of the evidence behind; they now clean up as Ctrl-C does. A second stop during the cleanup is ignored, so it cannot cut it short; a signal the caller ignores, as `nohup` ignores SIGHUP, stays ignored; and the handlers are put back before the line is printed.
+- A stop that landed just after the report was renamed into place said no report was written; it reports the report.
 - A Ctrl-C whose staging copy could not be removed said no report was written and nothing more; the line now names the copy.
-- C1 control characters and line and paragraph separators were not treated as unsafe, so one in a name could split a `fail` line or reach `report.md`; they are shown as `?`, and such a file is listed under `Not in the index`. A DEL character in a value made `report.toml` invalid TOML; it is escaped.
+- C1 control characters and line and paragraph separators were not treated as unsafe, so one in a name could split a `fail` line or reach `report.md`; they are shown as `?`, and such a file is listed under `Not in the index`, as a file whose name holds a format character, such as a zero-width joiner, now is too. A DEL character in a value made `report.toml` invalid TOML; it is escaped.
 - A manifest that did not list `box.toml` was accepted; it is refused.
 - A `~` in a name could strike text through in `report.md`; it is escaped.
 - A file and a folder of the same name in the copy failed while writing; they stop the build before anything is written, naming both.
 - A report folder name Windows refuses, such as `CON`, was not checked; it is refused by name before anything is made.
-- A link or a duplicated entry inside `lists/`, `tooldata/` or a target's `creds/` was named by the file inside it; it is named by that place, however the name spells it.
-- With more than one target, building the model decompressed the archive a third time to read each `target.toml`; it reads them in the checksum pass. Looking up each copied file's SHA-256 walked the whole evidence list, a cost that grew with the square of the number of files; it is one lookup.
-- The release workflow published a tag whose changelog heading still said `(unreleased)`, and the wheel check accepted a member named twice; both are refused. The panel's CI job would have passed had its tests skipped, and the panel script put this checkout's `src/` ahead of an installed pwn-report; the job now fails on a skip, and the script uses `src/` only when nothing is installed.
+- A link or a duplicated entry inside `lists/`, `tooldata/` or a target's `creds/` was named by the file inside it; it is named by that place, however the name spells it. So is a manifest row in such a place that is refused for not being a portable path.
+- With more than one target, building the model decompressed the archive a third time to read each `target.toml`; it reads them in the checksum pass, so an archive pwn-broker wrote is decompressed twice to build the model and twice more to copy the evidence. Looking up each copied file's SHA-256 walked the whole evidence list, a cost that grew with the square of the number of files; it is one lookup.
+- The release workflow published a tag whose changelog heading still said `(unreleased)`, and the wheel check accepted a member named twice; both are refused. The panel's CI job would have passed had its tests skipped, and the panel script put this checkout's `src/` ahead of an installed pwn-report; the job now fails on a skip, and the script uses `src/` only when nothing is installed. The changelog and panel checks are run by the suite, in bash, as the workflow steps they are.
 - A one-byte file was shown as `1 bytes`.
 
 ## Building a release

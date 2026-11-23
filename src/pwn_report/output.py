@@ -460,6 +460,9 @@ def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
             ) from exc
         raise
     except BaseException as exc:
+        if isinstance(exc, KeyboardInterrupt) and not os.path.lexists(stage) and os.path.isdir(output):
+            # the stop landed between the rename and the return: the report is whole and in place
+            return model
         if _remove_stage(stage) and isinstance(exc, KeyboardInterrupt):
             raise Interrupted(stage) from exc
         raise

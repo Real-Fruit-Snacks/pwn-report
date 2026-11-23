@@ -127,7 +127,8 @@ def test_the_evidence_list_is_walked_a_fixed_number_of_times(tmp_path, monkeypat
 def test_building_the_model_decompresses_the_archive_twice_at_most(tmp_path, monkeypatch):
     # once to list the members, once to read the files the report uses. With two targets, reading
     # each target.toml in a pass of its own went back to the first one and decompressed everything
-    # before it again: here a big screenshot at the box's root
+    # before it again: here a big screenshot at the box's root, and a big scan between the two
+    # target.toml files, wider than any read buffer, so the step back to the first is a real one
     import gzip
     import hashlib
 
@@ -138,12 +139,17 @@ def test_building_the_model_decompresses_the_archive_twice_at_most(tmp_path, mon
     big = b"".join(hashlib.sha256(str(n).encode()).digest() for n in range(40_000))
     second = _target_toml().replace(b'name = "dc01"', b'name = "web01"').replace(b"10.10.10.161", b"10.10.10.162")
     second = second.replace(b'hostnames = ["forest.htb.local"]', b"hostnames = []")
-    extra = {"screenshots/big.png": big, "targets/web01/target.toml": second, "targets/web01/scans/a.txt": b"a"}
+    between = b"".join(hashlib.sha256(f"web01-{n}".encode()).digest() for n in range(40_000))
+    extra = {
+        "screenshots/big.png": big,
+        "targets/web01/target.toml": second,
+        "targets/web01/scans/big.bin": between,
+    }
     members.update(extra)
     records = list(base.records) + [
         file_record("screenshots/big.png", big),
         file_record("targets/web01/target.toml", second, target="web01"),
-        file_record("targets/web01/scans/a.txt", b"a", target="web01", first_seen=NOW),
+        file_record("targets/web01/scans/big.bin", between, target="web01", first_seen=NOW),
     ]
     members["manifest.toml"] = manifest_bytes(sorted(records, key=lambda r: r.path), kind=base.kind)
     archive = write_raw_archive(tmp_path / "big.tar.gz", lambda tar: add_members(tar, members))

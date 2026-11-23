@@ -74,44 +74,63 @@ def main(argv: list[str] | None = None) -> int:
         return _fail(f"no selection file at {args.select}")
     output = args.output if args.output is not None else default_output(archive)
     previous = _stop_on_signals()
+    built = False
     try:
-        build_report(archive, output, args.select)
+        try:
+            build_report(archive, output, args.select)
+            built = True
+        finally:
+            # before any line is printed: a stop from here on meets the caller's own handler, not
+            # one that raises out of main with a traceback
+            _put_back(previous)
     except KeyboardInterrupt as exc:
-        # build_report removes its staging folder on the way out; one it could not remove is named
-        left = getattr(exc, "left", None)
-        if left is not None:
-            _say(f"fail  interrupted; a partial copy was left at {left}: delete it, it holds copied evidence", sys.stderr)
-        else:
-            _say("fail  interrupted; no report was written", sys.stderr)
-        return 130
+        if not built:
+            # build_report removes its staging folder on the way out; one it could not remove is named
+            left = getattr(exc, "left", None)
+            if left is not None:
+                _say(f"fail  interrupted; a partial copy was left at {left}: delete it, it holds copied evidence", sys.stderr)
+            else:
+                _say("fail  interrupted; no report was written", sys.stderr)
+            return 130
+        # the stop landed once the report was in place: it is whole, and reported as written
     except (ReportError, OSError) as exc:
         return _fail(str(exc))
     except Exception as exc:
         # a bug must still end in one line, not a traceback, for whoever runs this command
         return _fail(f"unexpected error: {type(exc).__name__}: {exc}")
-    finally:
-        for number, handler in previous.items():
-            signal.signal(number, handler)
     _say(f"ok    report {output}", sys.stdout)
     return 0
 
 
-def _interrupt(signum, frame) -> None:
-    raise KeyboardInterrupt
-
-
 def _stop_on_signals() -> dict:
-    """SIGTERM (pwn-broker's timeout, a kill) and SIGHUP (a closed terminal or SSH session) end the
-    build as Ctrl-C does, so its staging folder is removed; by default they end it on the spot.
-    Returns the handlers they replaced."""
-    previous = {}
-    for name in ("SIGTERM", "SIGHUP"):
+    """Ctrl-C (SIGINT), SIGTERM (pwn-broker's timeout, a kill) and SIGHUP (a closed terminal or SSH
+    session) end the build with KeyboardInterrupt, so its staging folder is removed; by default
+    SIGTERM and SIGHUP end it on the spot. The first stop wins and the rest are ignored from then
+    on, so a second cannot cut the removal short. A signal the caller ignores, as nohup ignores
+    SIGHUP, stays ignored, and one whose handler Python cannot put back is left alone. Returns the
+    handlers replaced."""
+    previous: dict = {}
+
+    def stop(signum, frame) -> None:
+        for number in previous:
+            signal.signal(number, signal.SIG_IGN)
+        raise KeyboardInterrupt
+
+    for name in ("SIGINT", "SIGTERM", "SIGHUP"):
         number = getattr(signal, name, None)
         if number is None:
             continue
         try:
-            previous[number] = signal.signal(number, _interrupt)
+            current = signal.getsignal(number)
+            if current is None or current == signal.SIG_IGN:
+                continue
+            previous[number] = signal.signal(number, stop)
         except (ValueError, OSError):
             # not the main thread, as when a program imports and calls main: leave its handlers
             pass
     return previous
+
+
+def _put_back(previous: dict) -> None:
+    for number, handler in previous.items():
+        signal.signal(number, handler)

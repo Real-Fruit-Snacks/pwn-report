@@ -566,3 +566,160 @@ def test_an_odd_spelling_of_a_held_back_place_is_still_named_by_the_place(tmp_pa
     message = str(raised.value)
     assert "SECRET-INNER-NAME" not in message, message
     assert any(place in message for place in ("lists/", "tooldata/", "targets/dc01/creds/")), message
+
+
+def _sentinel(signum, frame) -> None:
+    """A handler a test sets itself, to see that it is the one put back."""
+
+
+def _stop_signals() -> list:
+    import signal
+
+    return [getattr(signal, name) for name in ("SIGINT", "SIGTERM", "SIGHUP") if hasattr(signal, name)]
+
+
+@pytest.fixture
+def own_handlers():
+    import signal
+
+    saved = {number: signal.getsignal(number) for number in _stop_signals()}
+    for number in saved:
+        signal.signal(number, _sentinel)
+    yield
+    for number, handler in saved.items():
+        signal.signal(number, handler)
+
+
+def _junk_archive(tmp_path):
+    path = tmp_path / "junk.tar.gz"
+    path.write_bytes(b"not an archive")
+    return path
+
+
+@pytest.mark.parametrize("good", [True, False], ids=["built", "failed"])
+def test_the_handlers_are_put_back_as_they_were(tmp_path, own_handlers, good):
+    import signal
+
+    archive = make_archive(tmp_path / "a.tar.gz", full=True).path if good else _junk_archive(tmp_path)
+    assert cli.main(["build", str(archive), "-o", str(tmp_path / "out")]) == (0 if good else 1)
+    assert [signal.getsignal(number) for number in _stop_signals()] == [_sentinel] * len(_stop_signals())
+
+
+@pytest.mark.parametrize("good", [True, False], ids=["built", "failed"])
+def test_the_line_is_printed_with_the_handlers_put_back(tmp_path, own_handlers, monkeypatch, good):
+    # a stop that lands while the line is printed meets the caller's own handler, not one that
+    # raises out of main with a traceback
+    import signal
+
+    seen = []
+    real = cli._say
+
+    def say(text, stream):
+        seen.append([signal.getsignal(number) for number in _stop_signals()] == [_sentinel] * len(_stop_signals()))
+        real(text, stream)
+
+    monkeypatch.setattr(cli, "_say", say)
+    archive = make_archive(tmp_path / "a.tar.gz", full=True).path if good else _junk_archive(tmp_path)
+    cli.main(["build", str(archive), "-o", str(tmp_path / "out")])
+    assert seen == [True]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows ends a process on SIGTERM with no handler run")
+@pytest.mark.parametrize("name", ["SIGINT", "SIGTERM", "SIGHUP"])
+def test_a_second_stop_cannot_cut_the_cleanup_short(tmp_path, capsys, monkeypatch, name):
+    import shutil
+    import signal
+    import time
+
+    from pwn_report import output
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    number = getattr(signal, name)
+    real_rmtree = shutil.rmtree
+
+    def stopped(*args, **kwargs):
+        os.kill(os.getpid(), number)
+        time.sleep(5)
+
+    def rmtree(*args, **kwargs):
+        os.kill(os.getpid(), number)  # pressed again, or the timeout's second SIGTERM
+        return real_rmtree(*args, **kwargs)
+
+    monkeypatch.setattr(output, "_validate_staging", stopped)
+    monkeypatch.setattr(output.shutil, "rmtree", rmtree)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
+    assert capsys.readouterr().err == "fail  interrupted; no report was written\n"
+    assert not (tmp_path / "out").exists() and not list(tmp_path.glob(".out.tmp-*"))
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows has no SIGHUP and ends a process on SIGTERM")
+@pytest.mark.parametrize("name", ["SIGINT", "SIGTERM", "SIGHUP"])
+def test_a_signal_the_caller_ignores_stays_ignored(tmp_path, capsys, monkeypatch, name):
+    # nohup ignores SIGHUP, and a shell ignores SIGINT for a job it starts in the background
+    import signal
+
+    from pwn_report import output
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    number = getattr(signal, name)
+    real = output._validate_staging
+
+    def checked(*args, **kwargs):
+        os.kill(os.getpid(), number)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(output, "_validate_staging", checked)
+    before = signal.signal(number, signal.SIG_IGN)
+    try:
+        assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 0
+        assert signal.getsignal(number) == signal.SIG_IGN
+    finally:
+        signal.signal(number, before)
+    assert capsys.readouterr().out == f"ok    report {tmp_path / 'out'}\n"
+
+
+def test_a_stop_just_after_the_rename_still_reports_the_report(tmp_path, capsys, monkeypatch):
+    import pathlib
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    real = pathlib.Path.rename
+
+    def renamed(self, target):
+        result = real(self, target)
+        raise KeyboardInterrupt  # the stop lands once the report is in place
+
+    monkeypatch.setattr(pathlib.Path, "rename", renamed)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == f"ok    report {tmp_path / 'out'}\n" and captured.err == ""
+    assert (tmp_path / "out" / "report.md").is_file()
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        "lists//SECRET-INNER-NAME",
+        "lists/./SECRET-INNER-NAME",
+        "lists/../lists/SECRET-INNER-NAME",
+        "targets/dc01/creds//SECRET-INNER-NAME",
+        "tooldata/../tooldata/SECRET-INNER-NAME",
+    ],
+)
+def test_a_refused_manifest_row_in_a_held_back_place_is_named_by_the_place(tmp_path, row):
+    base = make_archive(tmp_path / "b.tar.gz", full=True)
+    members = {path: data for path, data in base.members.items() if path != "manifest.toml"}
+    members["manifest.toml"] = manifest_bytes([*base.records, file_record(row, b"x")], kind=base.kind)
+    bad = write_raw_archive(tmp_path / "bad.tar.gz", lambda tar: add_members(tar, members))
+    with pytest.raises(ReportError) as raised:
+        build_model(bad)
+    message = str(raised.value)
+    assert "SECRET-INNER-NAME" not in message, message
+    assert any(place in message for place in ("lists/", "tooldata/", "targets/dc01/creds/")), message
+
+
+def test_a_selection_file_name_with_a_line_separator_is_refused(tmp_path):
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    selection = tmp_path / "pick ed.toml"
+    selection.write_bytes(b"schema = 1\n")
+    with pytest.raises(ReportError, match="selection filename is not portable"):
+        build_model(fixture.path, selection)

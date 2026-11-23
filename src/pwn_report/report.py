@@ -202,7 +202,10 @@ def _listed_path(value, label: str) -> str:
     control character is listed as other and never read."""
     value = _text(value, label)
     if _leaves_the_box(value) or any(part in {"", "."} for part in value.split("/")):
-        raise ReportError(f"manifest.toml lists {value!r}, which is not a portable relative path inside the box")
+        # a row in a held-back folder, however spelled, is named by the folder, never the file
+        group = held_back_group("/".join(_spelled(value)))
+        named = f"a path in {group}" if group and group.endswith("/") else repr(value)
+        raise ReportError(f"manifest.toml lists {named}, which is not a portable relative path inside the box")
     return value
 
 
@@ -253,10 +256,9 @@ def _member_sha(tar: tarfile.TarFile, member: tarfile.TarInfo, label: str) -> st
     return digest.hexdigest()
 
 
-def _entry_label(name: str) -> str:
-    """How an error names a member: by its name, or, inside a held-back place, by that place. The
-    name is read as the place it spells, by either slash, with empty and . parts dropped and ..
-    taken back, so no spelling of lists/ or creds/ gets the name of a file inside one printed."""
+def _spelled(name: str) -> list[str]:
+    """The parts of the place a name spells: by either slash, with empty and . parts dropped and
+    .. taken back. Only for naming a place in an error; never used as a path."""
     parts: list[str] = []
     for part in name.replace("\\", "/").split("/"):
         if part == "..":
@@ -264,6 +266,13 @@ def _entry_label(name: str) -> str:
                 parts.pop()
         elif part not in {"", "."}:
             parts.append(part)
+    return parts
+
+
+def _entry_label(name: str) -> str:
+    """How an error names a member: by its name, or, inside a held-back place, by that place, so no
+    spelling of lists/ or creds/ gets the name of a file inside one printed."""
+    parts = _spelled(name)
     group = held_back_group("/".join(parts[1:])) if len(parts) > 1 else None
     return f"in {parts[0]}/{group}" if group else repr(name)
 

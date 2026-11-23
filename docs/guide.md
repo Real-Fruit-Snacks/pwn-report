@@ -95,7 +95,7 @@ An evidence ID is `ev_` and the SHA-256 of the box's ID, the file's path and its
 | `box.toml`, `notes.md`, `manifest.toml`, `targets/<t>/target.toml` | read for the report itself; `notes.md` is copied |
 | anything else the manifest lists | shown by path under `Not in the index`, never read |
 
-A folder under `targets/` is a target only if it has its `target.toml`; files in one without it are listed under `Not in the index`. So is a file whose name holds a backslash or a control character. Neither stops the report.
+A folder under `targets/` is a target only if it has its `target.toml`; files in one without it are listed under `Not in the index`. So is a file whose name holds a backslash, a control or format character, such as a zero-width joiner or a right-to-left override, or a line or paragraph separator. Neither stops the report.
 
 `notes.md` and every copied file are copied as they were. pwn-broker's note keys can paste a credential into the note, tool output in `scans/` often shows the passwords it found, a screenshot can show one, and loot a selection copies can hold them, so a report can hold passwords even though it never reads the credential files. It is private, and it says so at the top.
 
@@ -124,12 +124,12 @@ The selection file's SHA-256 is recorded in `report.toml` and `report.json`. [se
 
 ## How the archive is checked
 
-The archive is untrusted input, read front to back at most three times: once to list its members, once to check the files the report uses against the manifest, and once to copy the evidence. It is never unpacked to disk.
+The archive is untrusted input, read front to back and never unpacked to disk. An archive pwn-broker wrote is decompressed four times: to list its members, to check the files the report uses against the manifest, and, for the copy, to list its members again and to copy the evidence. One laid out otherwise can take a fifth.
 
 - **Members**: regular files and folders only. Links, devices, pipes and sparse files are refused, as is a name that is absolute, starts with a drive letter, or climbs out with `..` by either kind of slash. One box folder holds everything.
 - **Limits**, the same as pwn-broker's own: at most 300,000 members, 4,096 bytes for a name and 64 MiB for all names together, a manifest of at most 64 MiB and `box.toml`, `target.toml` and a selection of at most 1 MiB each, and per-member header limits.
 - **The manifest**: every file the report uses must be listed with the size and SHA-256 it has; a changed or missing file stops the build. Held-back files are counted from the manifest alone.
-- **Writing**: the report is built in a hidden folder beside the output, checked file by file against the model and `SHA256SUMS`, and renamed into place only when everything matches and the archive's SHA-256 is still the one read at the start. On Linux and macOS the folder is readable only by its owner, mode 0700, and keeps that mode once renamed. On any failure, Ctrl-C included, and on Linux and macOS SIGTERM and SIGHUP too, the hidden folder is removed; if it cannot be, the `fail` line names it, since it holds copied evidence.
+- **Writing**: the report is built in a hidden folder beside the output, checked file by file against the model and `SHA256SUMS`, and renamed into place only when everything matches and the archive's SHA-256 is still the one read at the start. On Linux and macOS the folder is readable only by its owner, mode 0700, and keeps that mode once renamed. On any failure, Ctrl-C included, and on Linux and macOS SIGTERM and SIGHUP too, the hidden folder is removed, and a second stop during the removal is ignored; if it cannot be removed, the `fail` line names it, since it holds copied evidence. A signal the caller ignores, as `nohup` ignores SIGHUP, stays ignored.
 - **Names the system cannot hold**: on Windows, a name Windows refuses (`CON`, `aux.txt`, a trailing dot or space, `<>:"|?*`), and on Windows and macOS, two names that differ only in case or in Unicode form, stop the build before anything is written, naming the files. Leave one out with a selection rule, or build on Linux.
 
 ## The same report every time
