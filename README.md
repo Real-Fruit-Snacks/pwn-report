@@ -141,6 +141,7 @@ caption = "NTDS.dit copied off DC01 with the backup operator's rights"
 
 - The unit suite on Windows 11 under Python 3.13, with warnings treated as errors, including reports from archives made by pwn-broker 0.1.11's own code: a box with no targets and nothing typed at its os and difficulty, and a full box exported and finished
 - The same suite in Kali Rolling under WSL 2 with Python 3.14, as a normal user, with the README panel's tests and the cleanup on SIGTERM and SIGHUP
+- CI on every push: Ubuntu with Python 3.11 to 3.14, Windows Server 2025 and macOS 15, the pwn-broker job, the panel's job and two reproducible builds
 
 [docs/tested.md](docs/tested.md) is the full record: counts, versions, dates, what each run checked, and what has not been run.
 
@@ -156,4 +157,4 @@ The rest of the list is in [docs/tested.md](docs/tested.md#known-limits).
 ## License
 
 [MIT](LICENSE).
-[Guide](docs/guide.md) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
+[Project page](https://real-fruit-snacks.github.io/pwn-report/) · [Guide](docs/guide.md) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)

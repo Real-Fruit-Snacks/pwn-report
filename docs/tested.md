@@ -56,6 +56,17 @@ A third review, of the release candidate, found and changed:
 - The release workflow published a tag whose changelog heading still said `(unreleased)`, and the wheel check accepted a member named twice; both are refused, the heading matched as text. The wheel check also read the README in the wheel's metadata as if it were headers; it reads the headers alone. The panel's CI job would have passed had its tests skipped, and the panel script put this checkout's `src/` ahead of an installed pwn-report; the job now fails on a skip, and the script uses `src/` only when nothing is installed. The changelog and panel checks are run by the suite, in bash, as the workflow steps they are, and the sdist holds the workflows so that its own suite runs them too.
 - A one-byte file was shown as `1 bytes`.
 
+## CI
+
+On the first push, on 2026-11-23, every job passed:
+
+- The suite on Ubuntu 24.04 with Python 3.11, 3.12, 3.13 and 3.14: 450 passed, 17 skipped on each, with warnings treated as errors. The 17 are the 9 pwn-broker tests and the 3 panel tests, which have jobs of their own, and 5 that only mean something on Windows and macOS.
+- The suite on Windows Server 2025 (438 passed, 29 skipped) and macOS 15 (451 passed, 16 skipped).
+- The pwn-broker job, against pwn-broker 0.1.11: 9 passed.
+- The README panel's job: 3 passed, and the panels are what `docs/art/make-panel.py` draws.
+- The build job: two builds of the sdist and the wheel with the locked tools gave the same bytes, `release/check_wheel.py` accepted the wheel, and the sdist's own suite gave 450 passed, 17 skipped.
+- The links check.
+
 ## Building a release
 
 With the locked build tools, two builds of the same commit gave the same sdist and wheel, byte for byte, and `release/check_wheel.py` accepted the wheel. Every workflow parses and passes `actionlint`.
@@ -74,5 +85,4 @@ With the locked build tools, two builds of the same commit gave the same sdist a
 
 ## Not run yet
 
-- CI on Linux with Python 3.11 to 3.14, and on Windows and macOS: the workflows exist and run on the first push.
 - Kali by hand, as a normal user.
