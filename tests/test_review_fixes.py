@@ -1030,3 +1030,52 @@ def test_a_stop_before_a_handler_is_put_back_still_puts_it_back(tmp_path, capsys
     assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 0
     assert capsys.readouterr().out == f"ok    report {tmp_path / 'out'}\n"
     assert fired and [signal.getsignal(n) for n in _stop_signals()] == [_sentinel] * len(_stop_signals())
+
+
+def test_a_stop_while_whats_left_is_looked_at_still_names_the_copy(tmp_path, capsys, monkeypatch):
+    # after a failure the staging folder cannot be removed, and the stop lands as the removal
+    # looks at what is left: the copy is still named
+    import os
+    import shutil
+
+    from pwn_report import output
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    real_lexists = os.path.lexists
+    fired = []
+
+    def failed(*args, **kwargs):
+        raise ReportError("staged asset evidence/x has the wrong checksum")
+
+    def lexists(path):
+        if ".out.tmp-" in str(path) and not fired:
+            fired.append(path)
+            raise KeyboardInterrupt
+        return real_lexists(path)
+
+    monkeypatch.setattr(output, "_validate_staging", failed)
+    monkeypatch.setattr(output.shutil, "rmtree", lambda *args, **kwargs: None)
+    monkeypatch.setattr(output.os.path, "lexists", lexists)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
+    err = capsys.readouterr().err
+    assert fired and err.startswith("fail  interrupted; a partial copy was left at "), err
+    monkeypatch.undo()
+    for left in tmp_path.glob(".out.tmp-*"):
+        shutil.rmtree(left)
+
+
+def test_a_folder_made_at_the_output_before_staging_is_not_taken_for_the_report(tmp_path, capsys, monkeypatch):
+    # the stop lands while the model is built, before anything is staged, and something else has
+    # made an empty folder at the output: it is not this build's report
+    from pwn_report import output
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+
+    def stopped(*args, **kwargs):
+        (tmp_path / "out").mkdir()
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(output, "build_model", stopped)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == "fail  interrupted; no report was written\n"
