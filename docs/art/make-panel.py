@@ -78,16 +78,16 @@ OUT_AT = 18.3       # everything fades out, then the loop starts again
 MONO = ("azeret-mono-latin.woff2", 400)
 MONO_B = ("azeret-mono-latin.woff2", 600)
 CUT = "…"
-COLS = 56
+COLS = 60
 PROMPT = "$ "
 WRAPPED = "~/pwn-broker/wrapped"
 GREP = "held"
 STATUS = {"ok": "mint", "fail": "fault"}   # the word pwn-report starts its one line with
 
 # Layout
-LX, RX, TOP, BOTTOM = 40, 568, 76, 404       # left window from LX, right window from RX to W - 40
-L_SIZE, L_PAD, L_FIRST, L_PITCH = 12.2, 16, 104, 23
-R_SIZE, R_PAD, R_FIRST, R_PITCH, R_INDENT = 11.4, 14, 104, 23, 12
+LX, RX, TOP, BOTTOM = 28, 576, 72, 404       # left window from LX, right window from RX to W - 28
+L_SIZE, L_PAD, L_FIRST, L_PITCH = 12.2, 16, 102, 23
+R_SIZE, R_PAD, R_FIRST, R_PITCH, R_INDENT = 11.4, 14, 102, 23, 12
 
 
 def _fail(message):
@@ -245,17 +245,37 @@ def pieces(line):
 
 
 def wrap(parts):
-    """A line as a COLS-wide terminal shows it: rows of [column, text, colour] runs."""
+    """Word-wrap a line into a COLS-wide terminal: rows of [column, text, colour] runs."""
     chars = [(ch, colour) for text, colour in parts for ch in text]
+    indent = 6 if parts and parts[0][0] in STATUS else 0
     rows = []
-    for start in range(0, max(len(chars), 1), COLS):
+    pos = 0
+    while pos < len(chars) or not rows:
+        col0 = 0 if not rows else indent
+        limit = COLS - col0
+        rem = chars[pos:]
+        if len(rem) <= limit:
+            chunk = rem
+            pos = len(chars)
+        else:
+            cut = next((i for i in range(limit, 0, -1) if rem[i][0] == " "), None)
+            if cut is not None:
+                chunk = rem[:cut]
+                pos += cut
+                while pos < len(chars) and chars[pos][0] == " ":
+                    pos += 1
+            else:
+                chunk = rem[:limit]
+                pos += limit
         runs = []
-        for i, (ch, colour) in enumerate(chars[start:start + COLS]):
+        for i, (ch, colour) in enumerate(chunk):
             if runs and runs[-1][2] == colour:
                 runs[-1][1] += ch
             else:
-                runs.append([i, ch, colour])
+                runs.append([col0 + i, ch, colour])
         rows.append(runs)
+        if not rem:
+            break
     return rows
 
 
@@ -345,7 +365,7 @@ class Anim:
 def check_layout(timed, folder, end):
     """Stop if a command would wrap, a piece leaves its window, or the loop runs out of time."""
     cw, rcw = char_w(L_SIZE), char_w(R_SIZE)
-    if LX + L_PAD + COLS * cw > RX - 20 - L_PAD:
+    if LX + L_PAD + COLS * cw > RX - 18 - L_PAD:
         _fail(f"{COLS} columns run past the right edge of the terminal")
     rows = 0
     for item in timed:
@@ -360,7 +380,7 @@ def check_layout(timed, folder, end):
     for r, (depth, layers) in enumerate(folder):
         x0 = RX + R_PAD + depth * R_INDENT
         for _, s, _, _ in layers:
-            if x0 + len(s) * rcw > W - 40 - R_PAD:
+            if x0 + len(s) * rcw > W - 28 - R_PAD:
                 _fail(f"{s!r} runs past the right edge of the folder")
         if R_FIRST + r * R_PITCH + R_SIZE * 0.25 > BOTTOM:
             _fail(f"row {r} of the folder is below its window")
@@ -453,14 +473,15 @@ def draw(theme, timed, folder):
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img">']
     o.append(a.style())
     # --- the plate, the terminal and the folder's pane ---
-    o.append(f'<rect x="0.5" y="0.5" width="{W - 1}" height="{H - 1}" rx="12" fill="{c["plate"]}" stroke="{c["line"]}"/>')
-    o.append(f'<rect x="1" y="1" width="{W - 2}" height="3" rx="1.5" fill="url(#rfs-bar)"/>')
-    o.append(text("pwn-report", LX, 52, 15, MONO_B, c["mute"]))
-    o.append(text(WRAPPED + "/", RX, 52, 15, MONO, c["mute"]))
-    o.append(f'<rect x="{LX}" y="{TOP}" width="{RX - 20 - LX}" height="{BOTTOM - TOP}" rx="8" fill="{c["glass"]}" stroke="{c["line"]}"/>')
-    o.append(f'<rect x="{RX}" y="{TOP}" width="{W - 40 - RX}" height="{BOTTOM - TOP}" rx="8" fill="none" stroke="{c["line"]}"/>')
+    o.append(f'<rect x="0.5" y="0.5" width="{W - 1}" height="{H - 1}" rx="10" fill="{c["plate"]}" stroke="{c["line"]}"/>')
+    o.append(f'<rect x="0" y="0" width="{W}" height="3" fill="url(#rfs-bar)" clip-path="url(#card-clip)"/>')
+    o.append(text("pwn-report", LX, 50, 14.5, MONO_B, c["mute"]))
+    o.append(text(WRAPPED + "/", RX, 50, 14.5, MONO, c["mute"]))
+    o.append(f'<rect x="{LX}" y="{TOP}" width="{RX - 18 - LX}" height="{BOTTOM - TOP}" rx="8" fill="{c["glass"]}" stroke="{c["line"]}"/>')
+    o.append(f'<rect x="{RX}" y="{TOP}" width="{W - 28 - RX}" height="{BOTTOM - TOP}" rx="8" fill="none" stroke="{c["line"]}"/>')
     o.append(f'<g class="run">{"".join(run)}</g>')
 
+    card_clip = f'<clipPath id="card-clip"><rect x="0.5" y="0.5" width="{W - 1}" height="{H - 1}" rx="10"/></clipPath>'
     bar_grad = (
         f'<linearGradient id="rfs-bar" x1="0" y1="0" x2="1" y2="0">'
         f'<stop offset="0%" stop-color="{c["steel"]}"/>'
@@ -468,7 +489,7 @@ def draw(theme, timed, folder):
         f'<stop offset="100%" stop-color="{c["beacon"]}"/>'
         f'</linearGradient>'
     )
-    defs = bar_grad + "".join(f'<path id="{gid}" d="{d}"/>' for gid, d in _glyphs.values() if d)
+    defs = card_clip + bar_grad + "".join(f'<path id="{gid}" d="{d}"/>' for gid, d in _glyphs.values() if d)
     o.insert(1, f"<defs>{defs}</defs>")
     o.append("</svg>")
     return "".join(o) + "\n"
