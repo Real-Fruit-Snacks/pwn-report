@@ -81,10 +81,10 @@
             <p class="sub"><a href="https://real-fruit-snacks.github.io/pwn-broker/">pwn-broker</a> keeps a box's targets, notes, credentials and files in order, and ends with one archive. pwn-report reads that archive and writes a report folder beside it: the box, its targets and flags, a timeline taken from the archive's own records, and an index of every scan, screenshot, exploit, loot file and recording, each with its SHA-256 and a link to its copy. It never runs anything from the archive, never contacts the network, and never changes the archive.</p>
             <ol class="ck steps" id="report-ck" aria-label="A report, built and checked">
                 <li id="install" data-state="todo"><span class="box" aria-hidden="true"></span><span class="ch">Install</span><span class="ld" aria-hidden="true"></span><span class="rs">With pipx</span>
-                    <div class="act"><div class="cmd"><pre><code>curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/pwn_report-0.1.0-py3-none-any.whl
-curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/SHA256SUMS.txt
-sha256sum -c --ignore-missing SHA256SUMS.txt
-pipx install ./pwn_report-0.1.0-py3-none-any.whl</code></pre><button class="copy" type="button" data-copy="curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/pwn_report-0.1.0-py3-none-any.whl&#10;curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/SHA256SUMS.txt&#10;sha256sum -c --ignore-missing SHA256SUMS.txt&#10;pipx install ./pwn_report-0.1.0-py3-none-any.whl">Copy</button></div></div>
+                    <div class="act"><div class="rfs-code-card"><div class="rfs-code-head"><span class="rfs-badge b-steel"><span class="k">[sh]</span> pipx install</span><button class="copy" type="button" data-copy="curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/pwn_report-0.1.0-py3-none-any.whl&#10;curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/SHA256SUMS.txt&#10;sha256sum -c --ignore-missing SHA256SUMS.txt&#10;pipx install ./pwn_report-0.1.0-py3-none-any.whl">Copy</button></div><pre class="rfs-code-block"><code><span class="rfs-tok-kw">curl</span> <span class="rfs-tok-fn">-fsSLO</span> <span class="rfs-tok-str">https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/pwn_report-0.1.0-py3-none-any.whl</span>
+<span class="rfs-tok-kw">curl</span> <span class="rfs-tok-fn">-fsSLO</span> <span class="rfs-tok-str">https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/SHA256SUMS.txt</span>
+<span class="rfs-tok-kw">sha256sum</span> <span class="rfs-tok-fn">-c --ignore-missing</span> <span class="rfs-tok-str">SHA256SUMS.txt</span>
+<span class="rfs-tok-kw">pipx</span> <span class="rfs-tok-fn">install</span> <span class="rfs-tok-str">./pwn_report-0.1.0-py3-none-any.whl</span></code></pre></div></div>
                     <p class="why">Python 3.11 or later, standard library only, on Linux, Windows or macOS. Each release has a wheel and its SHA-256 in <code>SHA256SUMS.txt</code>. On Kali, <code>pipx</code> comes from <code>sudo apt install pipx</code>. Elsewhere, install the same wheel into a virtual environment with <code>python -m pip install pwn_report-0.1.0-py3-none-any.whl</code>. In a pwn-broker box, <code>tool install report</code> gets it from pwn-shop, and from pwn-broker 0.1.12 <code>finish</code> builds the report by itself.</p></li>
                 <li data-step="2" data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">Build the report</span><span class="ld" aria-hidden="true"></span><span class="rs">Beside the archive</span></li>
                 <li data-step="3" data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">Build it again</span><span class="ld" aria-hidden="true"></span><span class="rs">Not replaced</span></li>
@@ -204,12 +204,18 @@ Held back, never read or copied:
 <section class="card ref" id="select" aria-labelledby="select-h">
     <h2 id="select-h">Choosing what goes in</h2>
     <p class="intro">A selection file adds captions and alt text and decides which indexed files are copied. Build with <code>pwn-report build &lt;archive&gt; --select selection.toml</code>. The <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/docs/guide.md#a-selection-file">guide</a> has every field, and <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/docs/selection.example.toml">docs/selection.example.toml</a> is a full one.</p>
-    <div class="cmd cmd-block"><pre><code>schema = 1
+    <div class="rfs-code-card">
+        <div class="rfs-code-head">
+            <span class="rfs-badge b-beacon"><span class="k">[toml]</span> selection.toml</span>
+            <button class="copy" type="button" data-copy="schema = 1&#10;&#10;[[rule]]&#10;path = &quot;targets/dc01/loot/ntds.dit&quot;&#10;include = true&#10;caption = &quot;NTDS.dit copied off DC01 with the backup operator's rights&quot;">Copy</button>
+        </div>
+        <pre class="rfs-code-block"><code><span class="rfs-tok-kw">schema</span> = <span class="rfs-tok-num">1</span>
 
-[[rule]]
-path = "targets/dc01/loot/ntds.dit"
-include = true
-caption = "NTDS.dit copied off DC01 with the backup operator's rights"</code></pre><button class="copy" type="button" data-copy="schema = 1&#10;&#10;[[rule]]&#10;path = &quot;targets/dc01/loot/ntds.dit&quot;&#10;include = true&#10;caption = &quot;NTDS.dit copied off DC01 with the backup operator's rights&quot;">Copy</button></div>
+<span class="rfs-tok-fn">[[rule]]</span>
+<span class="rfs-tok-kw">path</span> = <span class="rfs-tok-str">"targets/dc01/loot/ntds.dit"</span>
+<span class="rfs-tok-kw">include</span> = <span class="rfs-tok-num">true</span>
+<span class="rfs-tok-kw">caption</span> = <span class="rfs-tok-str">"NTDS.dit copied off DC01 with the backup operator's rights"</span></code></pre>
+    </div>
 </section>
 
 <section class="card ref" id="tested" aria-labelledby="tested-h">
