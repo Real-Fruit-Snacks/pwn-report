@@ -19,27 +19,48 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0E1012">
-<link rel="preload" href="fonts/overpass-latin-900-normal.woff2" as="font" type="font/woff2" crossorigin>
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#050507">
+<link rel="preload" href="fonts/big-shoulders-stencil-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/azeret-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
 <script>
-    // A saved theme wins over the system setting; the key is shared with the other RFS pages.
-    // js-run hides the terminal's lines until script.js plays them (a CSS failsafe shows them after 6 s).
+    // Dark (LX 263) default; opt-in light (LX 512) synced via rfs-theme across RFS pages.
     (function (d) {
-        try { var t = localStorage.getItem('rfs-theme'); if (t === 'nightshift' || t === 'dayshift') d.dataset.theme = t; } catch (e) {}
+        try {
+            var t = localStorage.getItem('rfs-theme');
+            if (t === 'light' || t === 'dayshift') d.dataset.theme = 'light';
+        } catch (e) {}
         if (window.matchMedia && matchMedia('(prefers-reduced-motion: no-preference)').matches) d.classList.add('js-run');
     })(document.documentElement);
 </script>
+<link rel="stylesheet" href="rfs.css">
+<link rel="stylesheet" href="rfs-components.css">
 <link rel="stylesheet" href="styles.css">
 </head>
-<body class="is-report">
-<a class="skip" href="#install">Skip to the install lines</a>
+<body class="rfs-shell is-report">
+<a class="rfs-skip" href="#install">Skip to the install lines</a>
 
-<header class="wrap">
-    <div class="spine">
-        <a class="set" href="https://real-fruit-snacks.github.io/"><img src="icon.svg" alt="" width="26" height="26">Real-Fruit-Snacks</a>
-        <a class="gh" href="https://github.com/Real-Fruit-Snacks/pwn-report">GitHub</a>
-        <button class="theme" type="button" id="theme"><span class="sr-only">Theme: </span><span class="t-night">Night</span><span class="t-day">Day</span></button>
+<header class="rfs-shell-header top">
+    <div class="wrap top-inner">
+        <a class="brand" href="https://real-fruit-snacks.github.io/">
+            <img class="brand-tile" src="icon.svg" alt="" width="28" height="28">
+            <span class="brand-text">PWN-REPORT</span>
+        </a>
+        <nav class="top-nav" aria-label="Links">
+            <a href="#holds">What it holds</a>
+            <a href="#reads">Privacy</a>
+            <a href="https://github.com/Real-Fruit-Snacks/pwn-report">GitHub</a>
+        </nav>
+        <button class="theme-btn" type="button" id="theme" aria-pressed="false" aria-label="Switch to LX 512 light theme">
+            <span class="theme-dot" aria-hidden="true"></span>
+            <span class="t-dark">LX 263 DARK</span>
+            <span class="t-light">LX 512 LIGHT</span>
+        </button>
     </div>
+</header>
+
+<div class="rfs-scroll-region page-scroll" id="page-scroll">
+<div class="wrap tabbar">
     <nav aria-label="The pwn set">
         <ul class="tabs">
             <li><a class="t-broker" href="https://real-fruit-snacks.github.io/pwn-broker/">Broker<small>the box</small></a></li>
@@ -48,7 +69,7 @@
             <li><a class="t-report" href="./" aria-current="page">Report<small>its evidence</small></a></li>
         </ul>
     </nav>
-</header>
+</div>
 
 <main class="wrap stack">
 <section class="card first" aria-labelledby="top-h">
@@ -79,7 +100,7 @@ pipx install ./pwn_report-0.1.0-py3-none-any.whl</code></pre><button class="copy
 <span class="ln"><span class="p">$</span> <span class="t">pwn-report build 2026-11-14_htb_forest.finished.tar.gz</span></span>
 <span class="ln s" data-step="2">ok    report 2026-11-14_htb_forest.finished.report</span>
 <span class="ln"><span class="p">$</span> <span class="t">pwn-report build 2026-11-14_htb_forest.finished.tar.gz</span></span>
-<span class="ln" data-step="3">fail  output already exists and will not be replaced: 2026-11-14_htb_forest.finished.report</span>
+<span class="ln f" data-step="3">fail  output already exists and will not be replaced: 2026-11-14_htb_forest.finished.report</span>
 <span class="ln"><span class="p">$</span> <span class="t">cd 2026-11-14_htb_forest.finished.report</span></span>
 <span class="ln"><span class="p">$</span> <span class="t">grep held report.md</span></span>
 <span class="ln o">- creds.toml: held back</span>
@@ -227,7 +248,9 @@ caption = "NTDS.dit copied off DC01 with the backup operator's rights"</code></p
     <p>MIT. Not affiliated with Hack The Box.</p>
     <p><a href="https://github.com/Real-Fruit-Snacks/pwn-report">Source</a> · <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/docs/guide.md">Guide</a> · <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/SECURITY.md">Security</a> · <a href="https://real-fruit-snacks.github.io/">RFS</a></p>
 </footer>
+</div>
 
+<div id="rfs-toast" class="rfs-toast is-ok" popover="manual" role="status" aria-live="polite"></div>
 <script src="script.js"></script>
 </body>
 </html>

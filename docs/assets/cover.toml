@@ -4,10 +4,7 @@
 name        = "pwn-report"
 description = "Private, evidence-linked reports from pwn-broker archives"   # README line 1
 
-# What pwn-report does, as a flow: a pwn-broker archive goes in, a report folder comes out. The
-# names are ones in the suite's full test archive and in the report built from it, the run the
-# README panel shows. No status line: pwn-report's one line names the report folder, and that is
-# too long for the strip.
+# What pwn-report does, as a flow: a pwn-broker archive goes in, a report folder comes out.
 [panel]
 kind = "flow"
 

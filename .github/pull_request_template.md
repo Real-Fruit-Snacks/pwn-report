@@ -1,13 +1,10 @@
-## What changes
+## Summary
 
-## Why
+- Plain summary of what changed and why.
 
-## Tested on
+## Verification
 
-- System:
-- Python:
-
-- [ ] `python -m pytest -q -W error` passes, with a test that fails without the change
-- [ ] A change to what a report holds is reflected in the README, `docs/guide.md` and `report.json`'s schema tests
-- [ ] No real archive, report, credential or flag is in the change; tests use synthetic archives only
-- [ ] `CHANGELOG.md` updated
+- [ ] Tested locally on target OS/runtime (note OS & version below)
+- [ ] CLI honors `NO_COLOR`, non-TTY stdout, and exit codes `0` / `1` / `2` (if applicable)
+- [ ] Web UI uses `rfs.css` + `rfs-components.css`, below-header scrollbars, and zero native `alert()`/`confirm()`/`prompt()` (if applicable)
+- [ ] Updated README / `cover.toml` if commands or screenshots changed

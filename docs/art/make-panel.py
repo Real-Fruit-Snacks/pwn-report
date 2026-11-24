@@ -57,17 +57,17 @@ if importlib.util.find_spec("pwn_report") is None:
 import fixtures  # noqa: E402  (the suite's own archive builder)
 from pwn_report import cli, output  # noqa: E402  (this checkout's pwn-report)
 
-# RFS Nightshift and Dayshift, as in the other pwn panels, with Raspberry for a failure
+# RFS Cyclorama Dawn v2.1.0 (LX 263 dark / LX 512 light), with Signal Crimson for failures
 THEMES = {
-    "dark": dict(plate="#1A1D24", glass="#070809", line="#262A33", ink="#E8E6E1", mute="#8A8F99",
-                 ember="#FF6A3D", mint="#3DDC97", fault="#F06292"),
-    "light": dict(plate="#FFFFFF", glass="#ECEAE4", line="#D6D3CB", ink="#1A1B1E", mute="#666A73",
-                  ember="#C03B0A", mint="#15794D", fault="#B0306A"),
+    "dark": dict(plate="#0D0E12", glass="#050507", line="#242834", ink="#F2F4F8", mute="#8F95A6",
+                 ember="#FF9254", mint="#3DDC97", fault="#FF5C6C", steel="#1F547A", beacon="#F06E2B"),
+    "light": dict(plate="#FFFFFF", glass="#F5F7F9", line="#CBD3DD", ink="#11141B", mute="#535B69",
+                  ember="#AD3D0A", mint="#127247", fault="#B91C2E", steel="#164669", beacon="#BD4811"),
 }
 
 W, H = 1000, 430
 CYCLE = 19.0        # seconds
-TYPE = 0.045        # per typed character (BRAND.md section 8)
+TYPE = 0.045        # per typed character (BRAND-RULES.md)
 GAP = 0.12          # between two printed lines
 STEP = 0.15         # between two files the build writes
 FADE = 0.25         # a row on the right appearing or changing
@@ -75,8 +75,8 @@ EASE = "cubic-bezier(.2,.7,.2,1)"
 STILL = 17.4        # the moment the base styles show
 OUT_AT = 18.3       # everything fades out, then the loop starts again
 
-MONO = "ibm-plex-mono-latin-400-normal.woff2"
-MONO_B = "ibm-plex-mono-latin-600-normal.woff2"
+MONO = ("azeret-mono-latin.woff2", 400)
+MONO_B = ("azeret-mono-latin.woff2", 600)
 CUT = "…"
 COLS = 56
 PROMPT = "$ "
@@ -86,8 +86,8 @@ STATUS = {"ok": "mint", "fail": "fault"}   # the word pwn-report starts its one 
 
 # Layout
 LX, RX, TOP, BOTTOM = 40, 568, 76, 404       # left window from LX, right window from RX to W - 40
-L_SIZE, L_PAD, L_FIRST, L_PITCH = 14, 18, 104, 23
-R_SIZE, R_PAD, R_FIRST, R_PITCH, R_INDENT = 13, 16, 104, 23, 16
+L_SIZE, L_PAD, L_FIRST, L_PITCH = 12.2, 16, 104, 23
+R_SIZE, R_PAD, R_FIRST, R_PITCH, R_INDENT = 11.4, 14, 104, 23, 12
 
 
 def _fail(message):
@@ -263,11 +263,16 @@ _fonts = {}
 _glyphs = {}   # (font, glyph name) -> (id, path in font units); drawn once in <defs>, reused by <use>
 
 
-def font(name):
-    if name not in _fonts:
+def font(spec):
+    if spec not in _fonts:
         from fontTools.ttLib import TTFont
-        _fonts[name] = TTFont(str(FONTS / name))
-    return _fonts[name]
+        from fontTools.varLib.instancer import instantiateVariableFont
+        fname, wght = spec
+        tt = TTFont(str(FONTS / fname))
+        if "fvar" in tt:
+            tt = instantiateVariableFont(tt, {"wght": wght}, inplace=True)
+        _fonts[spec] = tt
+    return _fonts[spec]
 
 
 def char_w(size, fname=MONO):
@@ -448,14 +453,22 @@ def draw(theme, timed, folder):
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img">']
     o.append(a.style())
     # --- the plate, the terminal and the folder's pane ---
-    o.append(f'<rect x="0.5" y="0.5" width="{W - 1}" height="{H - 1}" rx="22" fill="{c["plate"]}" stroke="{c["line"]}"/>')
-    o.append(text("pwn-report", LX, 52, 16, MONO_B, c["mute"]))
-    o.append(text(WRAPPED + "/", RX, 52, 16, MONO, c["mute"]))
-    o.append(f'<rect x="{LX}" y="{TOP}" width="{RX - 20 - LX}" height="{BOTTOM - TOP}" rx="12" fill="{c["glass"]}" stroke="{c["line"]}"/>')
-    o.append(f'<rect x="{RX}" y="{TOP}" width="{W - 40 - RX}" height="{BOTTOM - TOP}" rx="12" fill="none" stroke="{c["line"]}"/>')
+    o.append(f'<rect x="0.5" y="0.5" width="{W - 1}" height="{H - 1}" rx="12" fill="{c["plate"]}" stroke="{c["line"]}"/>')
+    o.append(f'<rect x="1" y="1" width="{W - 2}" height="3" rx="1.5" fill="url(#rfs-bar)"/>')
+    o.append(text("pwn-report", LX, 52, 15, MONO_B, c["mute"]))
+    o.append(text(WRAPPED + "/", RX, 52, 15, MONO, c["mute"]))
+    o.append(f'<rect x="{LX}" y="{TOP}" width="{RX - 20 - LX}" height="{BOTTOM - TOP}" rx="8" fill="{c["glass"]}" stroke="{c["line"]}"/>')
+    o.append(f'<rect x="{RX}" y="{TOP}" width="{W - 40 - RX}" height="{BOTTOM - TOP}" rx="8" fill="none" stroke="{c["line"]}"/>')
     o.append(f'<g class="run">{"".join(run)}</g>')
 
-    defs = "".join(f'<path id="{gid}" d="{d}"/>' for gid, d in _glyphs.values() if d)
+    bar_grad = (
+        f'<linearGradient id="rfs-bar" x1="0" y1="0" x2="1" y2="0">'
+        f'<stop offset="0%" stop-color="{c["steel"]}"/>'
+        f'<stop offset="55%" stop-color="{c["steel"]}"/>'
+        f'<stop offset="100%" stop-color="{c["beacon"]}"/>'
+        f'</linearGradient>'
+    )
+    defs = bar_grad + "".join(f'<path id="{gid}" d="{d}"/>' for gid, d in _glyphs.values() if d)
     o.insert(1, f"<defs>{defs}</defs>")
     o.append("</svg>")
     return "".join(o) + "\n"
