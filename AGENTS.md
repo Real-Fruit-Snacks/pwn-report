@@ -26,4 +26,5 @@ python -m pytest -q -W error
 
 - `pwn-report` CLI stdout/stderr format (`ok    report <folder>`, `fail  <reason>`) and exit codes (`0`, `1`, `2`, `130`) are part of the `pwn-broker` contract and must stay plain text.
 - `docs/assets/panel-{dark,light}.svg` must match `docs/art/make-panel.py` byte-for-byte.
+- **README & Docs (`BRAND.md` §14):** Keep `README.md` ultra-minimal (40–60 lines, keeping the install version, usage line, and verbatim `PRIVACY_NOTE` checked by `tests/test_docs.py`); put sample outputs and details in `docs/USAGE.md` and `docs/guide.md` (never GitHub Wiki).
 - Never mention private repositories or unrelated internal tools in any public file.

@@ -1,6 +1,6 @@
 # What has been tested
 
-Everything pwn-report has been run on, with the counts, versions and dates, and everything it has not. The [README](../README.md#tested-on) has the short list.
+Everything pwn-report has been run on, with the counts, versions and dates, and everything it has not. [USAGE.md](USAGE.md#tested-on) has the short list.
 
 ## Unit tests
 
