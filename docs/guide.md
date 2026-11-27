@@ -62,13 +62,13 @@ A build always prints exactly one line, and a control or format character from a
 7. **Not in the index**: the places held back, with how many files each holds, and every other listed file, by path.
 8. **Notes**: a link to the box's `notes.md`, copied unchanged.
 
-Every string from the archive is shown as text: Markdown and HTML in a file name, a caption or a flag value are escaped, template syntax such as `{{ }}` is left as plain text and never evaluated, and a control or format character, or a line or paragraph separator, such as a terminal escape or a right-to-left override, is shown as `?`.
+Every string from the archive is shown as text: Markdown and HTML in a file name, a caption or a flag value are escaped, at the start of a line too, where `#`, `-`, `1.` or four spaces would begin a heading, a list or a code block, template syntax such as `{{ }}` is left as plain text and never evaluated, and a control or format character, or a line or paragraph separator, such as a terminal escape or a right-to-left override, is shown as `?`.
 
-`report.toml` holds `generator`, `generator_version`, `schema_version`, `profile`, `box_id`, `archive_kind`, `source_archive_sha256`, `selection_sha256` when a selection was given, and `status`. `SHA256SUMS` has one `<sha256>  <path>` line for each file in the folder but itself, sorted by path, with a final newline.
+`report.toml` holds `generator`, `generator_version`, `schema_version`, `profile`, `box_id`, `archive_kind`, `source_archive_sha256`, `selection_sha256` when a selection was given, and `status`. A control or format character in the box's ID is written as a `\u` escape, as in `report.json`. `SHA256SUMS` has one `<sha256>  <path>` line for each file in the folder but itself, sorted by path, with a final newline.
 
 ### report.json
 
-The model, in schema version 1, with sorted keys, two-space indents and a final newline:
+The model, in schema version 1, with sorted keys, two-space indents and a final newline. Text in any script is written as it is. A control or format character, or a line or paragraph separator, is written as a `\u` escape, `\u009b` or `\u202e`, which loads back as the character it was, so printing the file sends no terminal escape and no right-to-left override to the terminal:
 
 | Key | What it holds |
 |---|---|
@@ -97,7 +97,7 @@ An evidence ID is `ev_` and the SHA-256 of the box's ID, the file's path and its
 | `box.toml`, `notes.md`, `manifest.toml`, `targets/<t>/target.toml` | read for the report itself; `notes.md` is copied |
 | anything else the manifest lists | shown by path under `Not in the index`, never read |
 
-A folder under `targets/` is a target only if it has its `target.toml`; files in one without it are listed under `Not in the index`. So is a file whose name holds a backslash, a control or format character, such as a zero-width joiner or a right-to-left override, or a line or paragraph separator. Neither stops the report; only a NUL character in a name, which no file system allows, stops the build.
+A folder under `targets/` is a target only if it has its `target.toml`; files in one without it are listed under `Not in the index`. So is a file whose name holds a backslash, a control or format character, such as a zero-width joiner or a right-to-left override, or a line or paragraph separator. Neither stops the report. A name that leaves the box stops the build, as [How the archive is checked](#how-the-archive-is-checked) says: one that climbs out with `..` by either kind of slash, such as `targets/dc01/loot/..\..\windows\win.ini`, and a file or folder at the box's root whose name starts with a backslash, or with a letter and a colon as a drive does, such as `\x` or `C:x`. So does a NUL character in a name, which no file system allows.
 
 `notes.md` and every copied file are copied as they were. pwn-broker's note keys can paste a credential into the note, tool output in `scans/` often shows the passwords it found, a screenshot can show one, and loot a selection copies can hold them, so a report can hold passwords even though it never reads the credential files. It is private, and it says so at the top.
 

@@ -16,7 +16,7 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, quote
 
 from . import __version__
-from .report import READ_BYTES, ReportError, _file_sha, _members, _open, build_model, shown
+from .report import READ_BYTES, UNSAFE_CATEGORIES, ReportError, _file_sha, _members, _open, build_model, shown
 from .validate import validate_model
 
 GENERATOR_VERSION = __version__
@@ -26,6 +26,8 @@ PRIVACY_NOTE = (
     "`notes.md` and every copied file are as they were and can hold passwords; keep this report private."
 )
 _LINK = re.compile(r"(?<!\\)\[[^\]\n]*(?<!\\)\]\(([^)\s]+)\)")
+# what starts a numbered list: up to nine digits, a . or a ), then a space or the end of the line
+_LIST_NUMBER = re.compile(r"^([0-9]{1,9})([.)])(?= |$)")
 _CHECKSUM_ROW = re.compile(r"^([0-9a-f]{64})  (.+)$")
 # device names Windows reserves in every folder, with or without an extension
 _WINDOWS_RESERVED = re.compile(r"^(?:con|prn|aux|nul|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3])(?:\..*)?$", re.I)
@@ -33,15 +35,45 @@ _WINDOWS_REFUSED = frozenset('<>:"|?*')
 NEXT_STEP = "exclude one with a selection rule, or build the report on Linux"
 
 
+def _escaped(text: str, beyond_ffff) -> str:
+    """Text that json.dumps wrote with ensure_ascii off, with each unsafe character it leaves as
+    it is (DEL, a C1 control, a format character such as a right-to-left override, a line or
+    paragraph separator) written as its \\u escape. json.dumps has already escaped the controls
+    below a space inside strings, so a line break still there is the layout's own and stays.
+
+    The characters to escape are found among the distinct ones in the text, and one pass
+    replaces them: str.translate took minutes over a report of many such characters."""
+    unsafe = sorted(
+        character
+        for character in set(text)
+        if character >= "\x7f" and unicodedata.category(character) in UNSAFE_CATEGORIES
+    )
+    if not unsafe:
+        return text
+    escapes = {
+        character: beyond_ffff(ord(character)) if ord(character) > 0xFFFF else f"\\u{ord(character):04x}"
+        for character in unsafe
+    }
+    return re.sub("[" + "".join(unsafe) + "]", lambda found: escapes[found.group()], text)
+
+
+def _surrogate_pair(code: int) -> str:
+    # JSON has four hex digits only, so a character past U+FFFF is two escapes; TOML has \U
+    code -= 0x10000
+    return f"\\u{0xD800 | (code >> 10):04x}\\u{0xDC00 | (code & 0x3FF):04x}"
+
+
 def _canonical_json(model: dict) -> bytes:
-    return (
-        json.dumps(model, ensure_ascii=False, allow_nan=False, sort_keys=True, indent=2) + "\n"
-    ).encode("utf-8")
+    """The model as JSON that is safe to print: text in any script is written as it is, and a
+    control or format character as an escape, which loads back as the character it was."""
+    text = json.dumps(model, ensure_ascii=False, allow_nan=False, sort_keys=True, indent=2) + "\n"
+    return _escaped(text, _surrogate_pair).encode("utf-8")
 
 
 def _toml_string(value: str) -> str:
-    # JSON's string escapes are TOML's too, except that JSON leaves DEL raw and TOML forbids it
-    return json.dumps(value, ensure_ascii=False).replace("\x7f", "\\u007f")
+    # JSON's string escapes are TOML's too, except that JSON leaves DEL and the other unsafe
+    # characters raw: TOML forbids DEL, and none of them should reach a terminal
+    return _escaped(json.dumps(value, ensure_ascii=False), lambda code: f"\\U{code:08x}")
 
 
 def _metadata_toml(model: dict) -> bytes:
@@ -65,12 +97,27 @@ def _metadata_toml(model: dict) -> bytes:
 def _md_text(value: str) -> str:
     """Keep source strings as literal inline Markdown data, including HTML-like text. A control
     or format character (an escape sequence, a right-to-left override) is shown as ?, so
-    reading report.md in a terminal cannot run one and a name cannot disguise itself."""
+    reading report.md in a terminal cannot run one and a name cannot disguise itself.
+
+    A value is also the first thing in a list item (a flag's name, a path outside the index) and
+    the last in a heading, where more than inline Markdown counts: there `# x` is a heading,
+    `- x`, `+ x` and `1. x` are lists, `---` is a rule, four spaces are a code block, and
+    `x ##` loses its end. So `#` is escaped wherever it is, and so is what the value starts
+    with when that could start a block; a space at either end, which Markdown drops or counts
+    as indentation, is written as `&#32;`. A tab is a control character, so it is ? by then."""
     value = value.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
     value = shown(value)
     value = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    for character in ("\\", "`", "*", "_", "[", "]", "|", "~"):
+    for character in ("\\", "`", "*", "_", "[", "]", "|", "~", "#"):
         value = value.replace(character, "\\" + character)
+    if value.startswith(("-", "+", "=")):
+        value = "\\" + value
+    else:
+        value = _LIST_NUMBER.sub(r"\1\\\2", value)
+    if value.startswith(" "):
+        value = "&#32;" + value[1:]
+    if value.endswith(" "):
+        value = value[:-1] + "&#32;"
     return value
 
 
@@ -374,7 +421,7 @@ def _validate_staging(
         raise ReportError("SHA256SUMS paths are not complete, unique, and sorted")
 
 
-def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
+def _build_report(archive: Path, output: Path, selection: Path | None, placed: list) -> dict:
     # first: on Windows NUL and CON exist in every folder, so they would read as an existing output
     problem = _unwritable_output(output.name, windows=os.name == "nt")
     if problem is not None:
@@ -451,6 +498,7 @@ def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
         if os.path.lexists(output):
             raise ReportError(f"output appeared during generation and will not be replaced: {output}")
         stage.rename(output)
+        placed.append(output)
         return model
     except Exception as exc:
         # the staging folder holds copied evidence and the notes: one that cannot be removed is
@@ -466,6 +514,8 @@ def _build_report(archive: Path, output: Path, selection: Path | None) -> dict:
             raise
         if not os.path.lexists(stage) and os.path.isdir(output):
             # the stop landed between the rename and the return: the report is whole and in place
+            if not placed:
+                placed.append(output)
             return model
         left = _remove_stage(stage)
         raise Interrupted(stage if left else None) from exc
@@ -503,13 +553,19 @@ def build_report(
     archive: str | os.PathLike[str],
     output: str | os.PathLike[str],
     selection: str | os.PathLike[str] | None = None,
+    *,
+    placed: list | None = None,
 ) -> dict:
-    """Build a deterministic report directory, refusing every existing output."""
+    """Build a deterministic report directory, refusing every existing output.
+
+    `placed`, if given, has the output path added to it at the moment the report is renamed into
+    place. A caller that is stopped then knows whether this call wrote the report: a folder at
+    the output says nothing, since another run can have put one there."""
     archive_path = Path(archive)
     output_path = Path(output)
     selection_path = Path(selection) if selection is not None else None
     try:
-        return _build_report(archive_path, output_path, selection_path)
+        return _build_report(archive_path, output_path, selection_path, [] if placed is None else placed)
     except ReportError:
         raise
     # zlib.error comes through raw when the deflate stream breaks inside a member's data, and

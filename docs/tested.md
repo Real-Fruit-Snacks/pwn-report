@@ -56,6 +56,14 @@ A third review, of the release candidate, found and changed:
 - The release workflow published a tag whose changelog heading still said `(unreleased)`, and the wheel check accepted a member named twice; both are refused, the heading matched as text. The wheel check also read the README in the wheel's metadata as if it were headers; it reads the headers alone. The panel's CI job would have passed had its tests skipped, and the panel script put this checkout's `src/` ahead of an installed pwn-report; the job now fails on a skip, and the script uses `src/` only when nothing is installed. The changelog and panel checks are run by the suite, in bash, as the workflow steps they are, and the sdist holds the workflows so that its own suite runs them too.
 - A one-byte file was shown as `1 bytes`.
 
+A fourth review, after the first release, found and changed:
+
+- A name that begins like a Markdown block was drawn as one in `report.md`: a file at the box's root named `# Reviewed and approved` was a heading, `- -` a rule, `1. x` a numbered list and one with four leading spaces a code block, a flag with such a name the same, and a `#` at the end of a target's or a file's heading was dropped. What a value starts with is escaped where it could start a block, `#` is escaped everywhere, and a space at either end is written as `&#32;`. The tests read the lines back with markdown-it-py, a CommonMark parser: each such start, and every run of up to three of the characters a block is made of, in each place a line puts a value, and a whole report whose names start blocks beside one whose names do not.
+- `report.json` held a C1 control or a format character raw, so printing it sent a name's terminal escape or right-to-left override to the terminal, and `report.toml` did the same with the box's ID. Both write one as a `\u` escape, which loads back as the same character; text in other scripts is written as it was.
+- A stop that landed while the archive was read, after another run had put its report at the output, printed `ok` for that report with status 0. The build now says when it has renamed its own report into place, and only then does a stop report a report.
+- Checking each file's target references made a set of every target, again for each file, so the check grew with the targets times the files: on Windows 11 with Python 3.13, an archive of 1.2 MB with 8,000 targets and 80,000 files took 13.1 s to check. It is one lookup for each reference, and the same archive takes 2.6 s. The model is still checked twice, as it is built and by what writes it: the second check is the writer's own, of whatever model it is given.
+- The guide said only a NUL character in a name stops the build, while a name that leaves the box does too; the guide now says so. The build does as it did.
+
 ## CI
 
 On the first push, on 2026-11-23, every job passed:

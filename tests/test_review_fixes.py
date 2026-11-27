@@ -1139,3 +1139,125 @@ def test_target_files_over_4_mib_together_are_refused(tmp_path):
     archive = write_raw_archive(tmp_path / "five.tar.gz", lambda tar: add_members(tar, members))
     with pytest.raises(ReportError, match="the target.toml files together exceed 4194304 bytes"):
         build_model(archive)
+
+
+def test_a_report_another_run_finishes_while_the_model_is_built_is_not_taken_for_this_one(tmp_path, capsys, monkeypatch):
+    # the stop lands while the model is built, before anything is staged, and since this build
+    # started another run has put a whole report at the output: it is not this build's
+    from pwn_report import output
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+
+    def stopped(*args, **kwargs):
+        (tmp_path / "out").mkdir()
+        (tmp_path / "out" / "SHA256SUMS").write_bytes(b"")
+        (tmp_path / "out" / "report.toml").write_bytes(b"")
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(output, "build_model", stopped)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == "fail  interrupted; no report was written\n"
+
+
+def test_a_report_another_run_finishes_as_the_handlers_are_set_is_not_taken_for_this_one(tmp_path, capsys, monkeypatch):
+    # the same before the build has begun: the stop lands while the handlers are being set
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+
+    def stopped(previous):
+        (tmp_path / "out").mkdir()
+        (tmp_path / "out" / "SHA256SUMS").write_bytes(b"")
+        (tmp_path / "out" / "report.toml").write_bytes(b"")
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "_stop_on_signals", stopped)
+    assert cli.main(["build", str(fixture.path), "-o", str(tmp_path / "out")]) == 130
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == "fail  interrupted; no report was written\n"
+
+
+def test_build_report_says_when_its_report_is_in_place(tmp_path, monkeypatch):
+    import pathlib
+
+    fixture = make_archive(tmp_path / "a.tar.gz", full=True)
+    placed = []
+    build_report(fixture.path, tmp_path / "out", placed=placed)
+    assert placed == [tmp_path / "out"]
+    # refused, since the folder is there: nothing was put in place by this call
+    again = []
+    with pytest.raises(ReportError, match="already exists"):
+        build_report(fixture.path, tmp_path / "out", placed=again)
+    assert again == []
+    # a stop that lands as the rename returns: in place, and said once
+    real = pathlib.Path.rename
+    stopped = []
+
+    def renamed(self, target):
+        real(self, target)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(pathlib.Path, "rename", renamed)
+    build_report(fixture.path, tmp_path / "late", placed=stopped)
+    assert stopped == [tmp_path / "late"] and (tmp_path / "late" / "report.md").is_file()
+
+
+def _model_of(targets: int, files: int) -> dict:
+    """A valid model of this many targets, with this many files indexed under the first."""
+    from fixtures import evidence_id, sha256
+    from pwn_report.report import _event_key
+
+    at = "2026-11-14T12:00:00+02:00"
+    digest = sha256(b"")
+    rows = [
+        {
+            "box_id": BOX_ID, "box": "forest", "name": name, "ips": [], "hostnames": [], "scope": "external",
+            "added": at, "source": {"path": f"targets/{name}/target.toml", "sha256": digest},
+        }
+        for name in sorted(f"t{number}" for number in range(targets))
+    ]  # fmt: skip
+    evidence = [
+        {
+            "id": evidence_id(path, digest), "path": path, "target": "t0", "target_refs": ["t0"], "first_seen": at,
+            "size": 0, "mtime": 0.0, "sha256": digest, "kind": "files",
+            "output": {"copied": False, "reason": "default-exclude-files"}, "source": {"path": path, "sha256": digest},
+        }
+        for path in sorted(f"targets/t0/files/f{number}" for number in range(files))
+    ]  # fmt: skip
+    timeline = [
+        {"at": at, "kind": "target_added", "target": row["name"], "source": row["source"]} for row in rows
+    ] + [
+        {"at": at, "kind": "file_first_seen", "evidence_id": item["id"], "source": item["source"]} for item in evidence
+    ]
+    timeline.sort(key=_event_key)
+    return {
+        "schema_version": 1, "profile": "private-technical", "status": "draft",
+        "box": {
+            "id": BOX_ID, "name": "forest", "platform": "htb", "os": "", "difficulty": "", "status": "active",
+            "started": at, "source": {"path": "box.toml", "sha256": digest},
+        },
+        "source": {
+            "archive": {"kind": "exported", "packed": at, "sha256": digest},
+            "manifest": {"path": "manifest.toml", "sha256": digest},
+        },
+        "flags": [], "targets": rows, "timeline": timeline, "evidence": evidence, "findings": [], "held_back": [],
+        "other": [],
+    }  # fmt: skip
+
+
+def test_checking_the_model_does_not_grow_with_targets_times_files():
+    # each file's target references were checked against a set of every target, made again for
+    # each file: 8,000 targets and 80,000 files, in an archive of 1.2 MB, took 13 seconds to check.
+    # Measured in this process's own time, so another's does not count. With as many targets as
+    # files, checking took nine times as long as with one target; it now takes under twice
+    import time
+
+    from pwn_report import validate_model
+
+    def seconds(model: dict) -> float:
+        start = time.process_time()
+        validate_model(model)
+        return time.process_time() - start
+
+    files = 12_000
+    one, many = _model_of(1, files), _model_of(files, files)
+    assert seconds(many) < 4 * max(seconds(one), 0.05)

@@ -14,7 +14,7 @@ python -m venv .venv
 .venv/bin/python -m pytest -q -W error
 ```
 
-The suite blocks the network in every test and uses only synthetic archives with canary values. Never add real box data to it.
+The suite blocks the network in every test and uses only synthetic archives with canary values. Never add real box data to it. The tests that read `report.md` back as a Markdown viewer would use markdown-it-py, which `.[dev]` installs, and skip without it.
 
 The tests in `tests/test_broker_compat.py` build reports from archives that pwn-broker's own code makes, and skip unless `PWN_REPORT_BROKER_SRC` names a pwn-broker checkout. They run its `tests/broker/make_archives.py` under the Python in `PWN_REPORT_BROKER_PYTHON` (this one by default), which needs pwn-broker's dependencies; CI installs pwn-broker into the same environment:
 
