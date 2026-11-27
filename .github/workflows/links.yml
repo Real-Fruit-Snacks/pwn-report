@@ -5,7 +5,7 @@ name: links
 on:
   push:
     branches: [main]
-    paths: ['**.md']
+    paths: ['**.md', 'docs/*.html', '.github/workflows/links.yml']
   schedule:
     - cron: '23 6 3 * *'
   workflow_dispatch:
@@ -28,7 +28,7 @@ jobs:
             --accept 200,206,429
             --exclude '^https://github\.com/Real-Fruit-Snacks/pwn-report/(issues/new|security/advisories/new)'
             --remap '^https://github\.com/Real-Fruit-Snacks/pwn-report/blob/main/(.*)$ file://${{ github.workspace }}/$1'
-            './**/*.md'
+            './**/*.md' './docs/*.html'
           fail: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

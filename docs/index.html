@@ -24,11 +24,15 @@
 <link rel="preload" href="fonts/big-shoulders-stencil-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/azeret-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
 <script>
-    // Dark (LX 263) default; opt-in light (LX 512) synced via rfs-theme across RFS pages.
+    // Dark (LX 263) default; opt-in light (LX 512) synced via rfs-theme and color-scheme across RFS pages.
     (function (d) {
         try {
-            var t = localStorage.getItem('rfs-theme');
-            if (t === 'light' || t === 'dayshift') d.dataset.theme = 'light';
+            var t = localStorage.getItem('rfs-theme') || localStorage.getItem('color-scheme');
+            if (t === 'light' || t === 'dayshift') {
+                d.dataset.theme = 'light';
+                var cs = document.querySelector('meta[name="color-scheme"]');
+                if (cs) cs.content = 'light';
+            }
         } catch (e) {}
         if (window.matchMedia && matchMedia('(prefers-reduced-motion: no-preference)').matches) d.classList.add('js-run');
     })(document.documentElement);
@@ -220,7 +224,7 @@ Held back, never read or copied:
 
 <section class="card ref" id="tested" aria-labelledby="tested-h">
     <h2 id="tested-h">Tested on</h2>
-    <p class="intro">The checks on the left passed; the two on the right have not been run yet. The full record, with counts, versions and dates, is in <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/docs/tested.md">docs/tested.md</a>.</p>
+    <p class="intro">Every check below passed except Kali by hand. The full record, with counts, versions and dates, is in <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/docs/tested.md">docs/tested.md</a>.</p>
     <div class="cols">
         <ul class="ck" aria-label="Checks run">
             <li data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">The unit suite</span><span class="ld" aria-hidden="true"></span><span class="rs">Passed</span>
@@ -230,9 +234,9 @@ Held back, never read or copied:
             <li data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">A release, built twice</span><span class="ld" aria-hidden="true"></span><span class="rs">Same bytes</span>
                 <p class="why">With the locked build tools, two builds of the same commit gave the same sdist and wheel, and the wheel check accepted the wheel.</p></li>
         </ul>
-        <ul class="ck" aria-label="Checks not run yet">
-            <li data-state="no"><span class="box" aria-hidden="true"></span><span class="ch">CI</span><span class="ld" aria-hidden="true"></span><span class="rs">Not run</span>
-                <p class="why">Linux with Python 3.11 to 3.14, and Windows and macOS: the workflows exist and run on the first push.</p></li>
+        <ul class="ck" aria-label="CI and remaining checks">
+            <li data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">CI</span><span class="ld" aria-hidden="true"></span><span class="rs">Passed</span>
+                <p class="why">On Ubuntu 24.04 under Python 3.11, 3.12, 3.13 and 3.14, Windows Server 2025 and macOS 15, plus the pwn-broker compatibility job, the README panel job and two reproducible builds.</p></li>
             <li data-state="no"><span class="box" aria-hidden="true"></span><span class="ch">Kali by hand</span><span class="ld" aria-hidden="true"></span><span class="rs">Not run</span>
                 <p class="why">As a normal user.</p></li>
         </ul>
