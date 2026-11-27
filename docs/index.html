@@ -224,21 +224,23 @@ Held back, never read or copied:
 
 <section class="card ref" id="tested" aria-labelledby="tested-h">
     <h2 id="tested-h">Tested on</h2>
-    <p class="intro">Every check below passed except Kali by hand. The full record, with counts, versions and dates, is in <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/docs/tested.md">docs/tested.md</a>.</p>
+    <p class="intro">Every check below passed except the last, which has not been run. The full record, with counts, versions and dates, is in <a href="https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/docs/tested.md">docs/tested.md</a>.</p>
     <div class="cols">
         <ul class="ck" aria-label="Checks run">
             <li data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">The unit suite</span><span class="ld" aria-hidden="true"></span><span class="rs">Passed</span>
                 <p class="why">On Windows 11 under Python 3.13, with warnings treated as errors and the network blocked in every test.</p></li>
             <li data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">Archives pwn-broker made</span><span class="ld" aria-hidden="true"></span><span class="rs">Passed</span>
-                <p class="why">Made by pwn-broker 0.1.11's own code: a box with no targets and nothing typed at its os and difficulty, and a full box exported and finished. Each report builds twice to identical bytes, with no byte of a held-back file in it.</p></li>
+                <p class="why">Made by pwn-broker 0.1.14's own code: a box with no targets and nothing typed at its os and difficulty, and a full box exported and finished. Each report builds twice to identical bytes, with no byte of a held-back file in it.</p></li>
             <li data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">A release, built twice</span><span class="ld" aria-hidden="true"></span><span class="rs">Same bytes</span>
                 <p class="why">With the locked build tools, two builds of the same commit gave the same sdist and wheel, and the wheel check accepted the wheel.</p></li>
         </ul>
         <ul class="ck" aria-label="CI and remaining checks">
             <li data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">CI</span><span class="ld" aria-hidden="true"></span><span class="rs">Passed</span>
                 <p class="why">On Ubuntu 24.04 under Python 3.11, 3.12, 3.13 and 3.14, Windows Server 2025 and macOS 15, plus the pwn-broker compatibility job, the README panel job and two reproducible builds.</p></li>
-            <li data-state="no"><span class="box" aria-hidden="true"></span><span class="ch">Kali by hand</span><span class="ld" aria-hidden="true"></span><span class="rs">Not run</span>
-                <p class="why">As a normal user.</p></li>
+            <li data-state="done"><span class="box" aria-hidden="true"></span><span class="ch">The release in Kali</span><span class="ld" aria-hidden="true"></span><span class="rs">Passed</span>
+                <p class="why">As a normal user, in Kali under WSL 2: the wheel downloaded from the release, checked against the release's checksums, installed on its own, and a report built from each box pwn-broker made.</p></li>
+            <li data-state="no"><span class="box" aria-hidden="true"></span><span class="ch">Kali outside WSL</span><span class="ld" aria-hidden="true"></span><span class="rs">Not run</span>
+                <p class="why">On its own machine or in a virtual machine.</p></li>
         </ul>
     </div>
 </section>

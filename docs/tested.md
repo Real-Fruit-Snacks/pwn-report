@@ -4,14 +4,14 @@ Everything pwn-report has been run on, with the counts, versions and dates, and 
 
 ## Unit tests
 
-- On Windows 11 with Python 3.13, the development machine, on 2026-11-23: 447 passed, 20 skipped, with warnings treated as errors and the pwn-broker compatibility tests included; without a pwn-broker checkout those 9 skip too. Of the 20 that skip, 3 are the README panel's, which need fonttools, 11 only mean something on Linux and macOS (signals sent to the build and a folder's mode), and 6 run the workflows' own steps in bash, as GitHub's Linux runners do.
-- In Kali Rolling under WSL 2, with Python 3.14.7, as a normal user, on 2026-11-23: 462 passed, 5 skipped, with the pwn-broker compatibility tests against pwn-broker 0.1.11, the panel's tests and the workflows' steps. The 5 that skip only mean something on Windows and macOS: a backslash as a path separator, two names that differ only in case, and three report folder names Windows refuses.
+- On Windows 11 with Python 3.13, the development machine, on 2026-11-27, at the commit that pins the workflows' actions: 449 passed, 20 skipped, with warnings treated as errors and the pwn-broker compatibility tests against pwn-broker 0.1.14; without a pwn-broker checkout those 9 skip too. Of the 20 that skip, 3 are the README panel's, which need fonttools, 11 only mean something on Linux and macOS (signals sent to the build and a folder's mode), and 6 run the workflows' own steps in bash, as GitHub's Linux runners do.
+- In Kali Rolling under WSL 2, with Python 3.14.7, as a normal user, on 2026-11-27, at the same commit: 464 passed, 5 skipped, with the pwn-broker compatibility tests against pwn-broker 0.1.14, the panel's tests and the workflows' steps. The 5 that skip only mean something on Windows and macOS: a backslash as a path separator, two names that differ only in case, and three report folder names Windows refuses.
 - Every test blocks the network: `socket`, `http.client` and `urllib` raise if anything reaches them.
 - Only synthetic archives, built in the tests with canary values in every file that must not reach a report: credentials, held-back files, loot, recordings, files the manifest does not list, and extra metadata. Each test that writes a report checks that none of them is in any of its files.
 
 ## Archives made by pwn-broker
 
-`tests/broker/make_archives.py` makes archives with pwn-broker's own code, the way its prompt does: `create_box` and `add_target`, the box's note, `flag user`, `flag root` and `cred add` through its command dispatcher, a file in every folder a tool or the user would write to, then `export_box` and `finish_box`. On 2026-11-23, against pwn-broker 0.1.11:
+`tests/broker/make_archives.py` makes archives with pwn-broker's own code, the way its prompt does: `create_box` and `add_target`, the box's note, `flag user`, `flag root` and `cred add` through its command dispatcher, a file in every folder a tool or the user would write to, then `export_box` and `finish_box`. On 2026-11-23 against pwn-broker 0.1.11, and on 2026-11-27 against pwn-broker 0.1.14, which CI now checks out:
 
 - A box with no targets and nothing typed at its os and difficulty, finished: the report builds, and both read `Not recorded`.
 - A full box, exported and then finished, worked across the night the clocks go back, so its times are at -04:00 before 06:00 UTC and at -05:00 after: each report builds twice to identical bytes, its timeline holds both offsets in an order that sorting the text would get wrong, and is in order by instant, every kind of evidence is indexed, the flags and the target are there, and `creds.toml`, `lists/`, `targets/dc01/creds/` and `tooldata/` are held back with no byte of their contents in any file.
@@ -62,7 +62,7 @@ On the first push, on 2026-11-23, every job passed:
 
 - The suite on Ubuntu 24.04 with Python 3.11, 3.12, 3.13 and 3.14: 450 passed, 17 skipped on each, with warnings treated as errors. The 17 are the 9 pwn-broker tests and the 3 panel tests, which have jobs of their own, and 5 that only mean something on Windows and macOS.
 - The suite on Windows Server 2025 (438 passed, 29 skipped) and macOS 15 (451 passed, 16 skipped).
-- The pwn-broker job, against pwn-broker 0.1.11: 9 passed.
+- The pwn-broker job, against pwn-broker 0.1.11: 9 passed. Since 2026-11-27 the job checks out pwn-broker 0.1.14: `finish` has run pwn-report by itself since 0.1.12, so 0.1.11 was older than any pwn-broker that does. The same 9 pass against 0.1.14 in Kali and on Windows, above.
 - The README panel's job: 3 passed, and the panels are what `docs/art/make-panel.py` draws.
 - The build job: two builds of the sdist and the wheel with the locked tools gave the same bytes, `release/check_wheel.py` accepted the wheel, and the sdist's own suite gave 450 passed, 17 skipped.
 - The links check.
@@ -76,14 +76,14 @@ The v0.1.0 release, on 2026-11-23: the release workflow's dry run on `main` and 
 - `pwn_report-0.1.0-py3-none-any.whl`: `fcf3aacda4cd07076042a3b92a7e5d9eefd966b853d74cf451d8482eaf8c446c`
 - `pwn_report-0.1.0.tar.gz`: `2b011b88e9e3a80cbaaa40c4332babb8cd0f44466da388b4f4244558cff49fcb`
 
-Downloaded from the release and checked against its `SHA256SUMS.txt`, the wheel was installed on its own in a new venv in Kali, as a user would: `pwn-report --version` printed `pwn-report 0.1.0`, and it built reports from a finished box with no targets and from a full finished box, both made by pwn-broker 0.1.11's own code; each report's `SHA256SUMS` held.
+Downloaded from the release and checked against its `SHA256SUMS.txt`, the wheel was installed on its own in a new venv in Kali, as a user would: `pwn-report --version` printed `pwn-report 0.1.0`, and it built reports from a finished box with no targets and from a full finished box, both made by pwn-broker 0.1.11's own code; each report's `SHA256SUMS` held. On 2026-11-27 the same was done again in Kali Rolling under WSL 2, as a normal user, with boxes made by pwn-broker 0.1.14's own code: the downloaded wheel had the SHA-256 above, and it built reports from the finished box with no targets and from the full box, exported and finished; each report's `SHA256SUMS` held.
 
 ## Known limits
 
 - A private report by design: there is no public writeup mode, no redaction of notes or scans, and no secret scanning.
 - No findings, severities or narrative: schema 1's `findings` is always empty.
 - On Windows, a path longer than 260 characters fails with the system's own message.
-- On Windows, a build ended from outside, by Task Manager or `taskkill /f`, runs no cleanup, so its hidden `.<name>.tmp-*` folder is left beside the output with the evidence copied so far. Ctrl-C cleans up.
+- A build ended in a way it cannot answer runs no cleanup, so its hidden `.<name>.tmp-*` folder is left beside the output with the evidence copied so far: SIGKILL on Linux and macOS, which pwn-broker's `finish` sends 5 seconds after its SIGTERM if the build is still running, and Task Manager or `taskkill /f` on Windows. Ctrl-C cleans up, as do SIGTERM and SIGHUP on Linux and macOS. In Kali, a build ended with SIGKILL while it copied six 48 MiB files left its folder, mode 0700, with four of them; ended with SIGTERM at the same point, it left nothing and exited 130.
 - Files in the archive that its manifest does not list leave no trace in the report.
 - There is no limit on the size of a file copied or hashed beyond the free space checked before writing: a box with a capture of many gigabytes in `scans/` takes as long as reading it takes. A selection rule leaves such a file out of the copy, but it is still read once to check its SHA-256.
 - An archive is read as long as it takes to decompress, the members its manifest does not list included: a crafted one that decompresses to many gigabytes costs that time. A crafted manifest at its 64 MiB limit can take over a GiB of memory to parse. Crafted target files at their 4 MiB limit cost far less: in Kali, seven targets of near 1 MiB each of one-character non-Latin addresses, in a 1.4 MB archive, peaked at 136 MiB, and of empty addresses, in an 8 KB archive, at 83 MiB, writing an 18.7 MiB report. A crafted archive that does both costs both. The member and manifest limits are pwn-broker's own; the target files' is pwn-report's.
@@ -92,4 +92,4 @@ Downloaded from the release and checked against its `SHA256SUMS.txt`, the wheel 
 
 ## Not run yet
 
-- Kali by hand, as a normal user.
+- Kali on its own machine or in a virtual machine. The suite's runs in Kali are under WSL 2, and so is the release's wheel as installed and run there by a normal user on 2026-11-27 ([Building a release](#building-a-release)).

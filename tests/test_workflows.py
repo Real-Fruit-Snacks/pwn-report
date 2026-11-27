@@ -1,8 +1,10 @@
-"""The workflows' own checks, run as GitHub runs a step: its script in bash with pipefail."""
+"""The workflows' own checks, run as GitHub runs a step: its script in bash with pipefail. And the
+actions the workflows use, each pinned to a commit."""
 
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -12,7 +14,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 # on Windows, bash on the PATH may be WSL's, which cannot read these paths; the steps run on Linux
 BASH = None if os.name == "nt" else shutil.which("bash")
-pytestmark = pytest.mark.skipif(BASH is None, reason="the workflows' steps run in bash on Linux and macOS")
+needs_bash = pytest.mark.skipif(BASH is None, reason="the workflows' steps run in bash on Linux and macOS")
 
 
 def _step(workflow: str, name: str) -> str:
@@ -48,6 +50,7 @@ def _run(tmp_path: Path, script: str, env: dict[str, str]) -> subprocess.Complet
     )
 
 
+@needs_bash
 @pytest.mark.parametrize(
     "heading, event, ref_type, publishes",
     [
@@ -68,6 +71,7 @@ def test_a_tag_is_refused_while_the_changelog_says_unreleased(tmp_path, heading,
     assert (result.returncode == 0) is publishes, result.stdout + result.stderr
 
 
+@needs_bash
 @pytest.mark.parametrize(
     "summary, passes",
     [("3 passed in 0.50s", True), ("1 passed, 2 skipped in 0.50s", False)],
@@ -78,3 +82,18 @@ def test_the_panel_job_fails_when_its_tests_skip(tmp_path, summary, passes):
     stand_in = f'python() {{ if [ "$2" = pytest ]; then echo "{summary}"; fi; }}\n'
     result = _run(tmp_path, stand_in + _step("ci.yml", "The panel's tests"), {})
     assert (result.returncode == 0) is passes, result.stdout + result.stderr
+
+
+def test_every_action_is_pinned_to_a_commit_with_its_version_beside_it():
+    # a tag such as v5 can be moved to other code, and the release workflow's second job can write
+    # to the repository; a commit cannot be moved. The version is in a comment, for whoever reads it
+    pinned = re.compile(r"(?:- )?uses: [\w.-]+/[\w./-]+@[0-9a-f]{40} # v[0-9]+\.[0-9]+\.[0-9]+")
+    used = [
+        (workflow.name, line.strip())
+        for workflow in sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+        for line in workflow.read_text(encoding="utf-8").splitlines()
+        if re.match(r"\s*(?:- )?uses:", line)
+    ]
+    assert {name for name, _ in used} == {"ci.yml", "links.yml", "release.yml"}
+    for name, line in used:
+        assert pinned.fullmatch(line), f"{name}: {line}"

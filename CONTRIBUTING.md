@@ -41,13 +41,13 @@ Rules that matter to a change:
 
 ## Commits
 
-One short, plain line in the imperative: `Keep a target's repeated addresses as recorded`. No prefixes, no trailing full stop. Say more in the PR if it needs it.
+One short, plain line in the imperative: `Keep a target's repeated addresses as recorded`. No prefix such as `docs:` or `fix:`, though a few commits in the history carry one, and no trailing full stop. Say more in the PR if it needs it.
 
 ## Cutting a release
 
 1. Set `__version__` in `src/pwn_report/__init__.py`; it is the only place the version is written.
 2. Change the top heading of `CHANGELOG.md` to the version and drop `(unreleased)`, for example `## v0.1.0`. The notes under it become the release notes.
-3. Set the version in the install lines of `README.md` and `docs/guide.md`, and the examples in `.github/ISSUE_TEMPLATE/bug.yml`; `git grep -n 'pwn_report-0\.1\.0\|v0\.1\.0'`, with the old version, finds them.
+3. Set the version in the install lines of `README.md`, `docs/guide.md` and `docs/index.html`, and the example in `.github/ISSUE_TEMPLATE/bug.yml`; `git grep -n 'pwn_report-0\.1\.0\|v0\.1\.0\|pwn-report 0\.1\.0'`, with the old version, finds them.
 4. Commit, run the `release` workflow by hand on `main` as a dry run, then tag and push: `git tag v0.1.0 && git push origin main v0.1.0`.
 
 The `release` workflow fails if the tag is not `v` and three dot-separated numbers, or not the package version. It builds the sdist and the wheel from `release/build-requirements.lock` with hashes required, records their SHA-256, checks the wheel with `release/check_wheel.py`, runs the suite against the installed wheel, and publishes the wheel, the sdist and `SHA256SUMS.txt` from a second job that runs none of the repository's code and refuses a file whose SHA-256 differs. Started by hand, it is a dry run: every step runs but the one that publishes. Two builds of the same commit give the same bytes, so the dry run's SHA-256 is the release's.

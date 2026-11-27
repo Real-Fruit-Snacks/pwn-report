@@ -1,18 +1,20 @@
-name: Feature request
-description: Propose a concrete local-first capability or improvement
-labels: ["enhancement"]
+name: Feature
+description: Something it should do and doesn't
+labels: [enhancement]
 body:
   - type: textarea
     id: problem
     attributes:
-      label: Problem to solve
-      description: Describe the workflow gap and real inputs/outputs involved.
+      label: The problem
+      description: What you're trying to get out of a box's archive, and what gets in the way today
     validations:
       required: true
   - type: textarea
-    id: proposal
+    id: shape
     attributes:
-      label: Proposed behavior
-      description: Concrete CLI flags, UI controls, or file format you have in mind.
-    validations:
-      required: true
+      label: What it might look like
+      description: A section of report.md, a field of report.json, a line of output. Optional.
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Current workaround

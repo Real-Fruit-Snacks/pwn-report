@@ -15,7 +15,7 @@ sha256sum -c --ignore-missing SHA256SUMS.txt && pipx install ./pwn_report-0.1.0-
 
 - **Usage:** `pwn-report build <archive> [-o <folder>] [--select <file>]` — writes `report.md`, `report.json`, `report.toml`, `SHA256SUMS`, and linked `evidence/` atomically beside the archive without overwriting existing reports.
 - **Privacy boundary:** It never reads `creds.toml`, `lists/`, `targets/*/creds/` or `tooldata/`. `notes.md` and every copied file are as they were and can hold passwords; keep this report private.
-- **Zero network, deterministic output:** Pure Python 3.11+ standard library; validates every archive file against the manifest SHA-256 and produces byte-identical reports for identical archives.
+- **Zero network, deterministic output:** Pure Python 3.11+ standard library; checks every file the report uses against the size and SHA-256 the manifest lists, and produces byte-identical reports for identical archives.
 - **Automatic in pwn-broker:** Run `tool install report` in [pwn-broker](https://github.com/Real-Fruit-Snacks/pwn-broker) (via [pwn-shop](https://github.com/Real-Fruit-Snacks/pwn-shop)) so `finish` builds the report automatically beside the archive.
 
 ## Documentation
