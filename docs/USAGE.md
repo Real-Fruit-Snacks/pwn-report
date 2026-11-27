@@ -102,7 +102,7 @@ Run `pwn-report build <archive> --select selection.toml`. See [guide.md#a-select
 
 - Unit suite on Windows 11 (Python 3.13, warnings as errors) and Kali Rolling under WSL 2 (Python 3.14), including reports from real `pwn-broker` archives, README panel tests, and SIGTERM/SIGHUP cleanup.
 - CI on every push: Ubuntu (Python 3.11–3.14), Windows Server 2025, macOS 15, `pwn-broker` compatibility job, panel job, and two reproducible builds.
-- Published `v0.1.0` wheel installed standalone in Kali against `pwn-broker` boxes.
+- Published `v0.1.1` wheel installed standalone in Kali against `pwn-broker` boxes.
 
 See [tested.md](tested.md) for the full record.
 

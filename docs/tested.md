@@ -86,6 +86,13 @@ The v0.1.0 release, on 2026-11-23: the release workflow's dry run on `main` and 
 
 Downloaded from the release and checked against its `SHA256SUMS.txt`, the wheel was installed on its own in a new venv in Kali, as a user would: `pwn-report --version` printed `pwn-report 0.1.0`, and it built reports from a finished box with no targets and from a full finished box, both made by pwn-broker 0.1.11's own code; each report's `SHA256SUMS` held. On 2026-11-27 the same was done again in Kali Rolling under WSL 2, as a normal user, with boxes made by pwn-broker 0.1.14's own code: the downloaded wheel had the SHA-256 above, and it built reports from the finished box with no targets and from the full box, exported and finished; each report's `SHA256SUMS` held.
 
+The v0.1.1 release, on 2026-11-27: the release workflow's dry run on `main` and its run for the tag built the same two files, byte for byte, and the run for the tag published them, after its suite against the built wheel gave 501 passed, 73 skipped. The 73 are the 9 pwn-broker tests and the 3 panel tests, 5 that only mean something on Windows and macOS, and the 56 that read `report.md` back with markdown-it-py, which that suite does not install:
+
+- `pwn_report-0.1.1-py3-none-any.whl`: `2ba75acd4c803f3418454e2bf5d6f0ededb7d1ac8c7dfae3f42116dbb6afdb5b`
+- `pwn_report-0.1.1.tar.gz`: `47ef370961e3a47f2fbb38931b94b9abfe64c3efde83d9832bd048f2a83ea018`
+
+Each is the SHA-256 in the release's `SHA256SUMS.txt` and the one GitHub shows for the file. Built in Kali with the locked tools, under Python 3.14.7, the same commit gave the same two files. Downloaded from the release and checked against its `SHA256SUMS.txt`, the wheel was installed on its own in a new venv in Kali Rolling under WSL 2, as a normal user: `pwn-report --version` printed `pwn-report 0.1.1`, and it built reports from the finished box with no targets and from the full box, exported and finished, all made by pwn-broker 0.1.14's own code; each report's `SHA256SUMS` held, and a second build of each was refused.
+
 ## Known limits
 
 - A private report by design: there is no public writeup mode, no redaction of notes or scans, and no secret scanning.
