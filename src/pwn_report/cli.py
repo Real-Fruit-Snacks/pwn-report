@@ -8,13 +8,12 @@ command at finish and relies on exactly these lines and statuses.
 from __future__ import annotations
 
 import argparse
-import os
 import signal
 import sys
 from pathlib import Path
 
 from . import __version__
-from .output import Interrupted, build_report
+from .output import build_report
 from .report import ReportError, shown
 
 _SUFFIX = ".tar.gz"
@@ -74,24 +73,23 @@ def main(argv: list[str] | None = None) -> int:
     if args.select is not None and not args.select.is_file():
         return _fail(f"no selection file at {args.select}")
     output = args.output if args.output is not None else default_output(archive)
-    # build_report never replaces a folder: if none is here now and a report is after a stop, it
-    # was renamed into place whole
-    existed = os.path.lexists(output)
+    # build_report adds the output here as it renames its report into place: after a stop, a
+    # report at the output is this build's only if this build put it there. One that another run
+    # finished meanwhile, at any point of this build, is not
+    placed: list = []
     previous: dict = {}
     try:
         try:
             # inside the try: a stop that lands while they are set is one line too
             _stop_on_signals(previous)
-            build_report(archive, output, args.select)
+            build_report(archive, output, args.select, placed=placed)
         finally:
             # before any line is printed: a stop from here on meets the caller's own handler, not
             # one that raises out of main with a traceback
             _put_back(previous)
     except KeyboardInterrupt as exc:
-        # a stop the build handled wrote no report of its own; only one that landed outside it,
-        # as build_report returned, can find this build's report in place
-        left = getattr(exc, "left", None)
-        if isinstance(exc, Interrupted) or existed or not _is_report(output):
+        if not placed:
+            left = getattr(exc, "left", None)
             # build_report removes its staging folder on the way out; one it could not remove is named
             if left is not None:
                 _say(f"fail  interrupted; a partial copy was left at {left}: delete it, it holds copied evidence", sys.stderr)
@@ -106,11 +104,6 @@ def main(argv: list[str] | None = None) -> int:
         return _fail(f"unexpected error: {type(exc).__name__}: {exc}")
     _say(f"ok    report {output}", sys.stdout)
     return 0
-
-
-def _is_report(output: Path) -> bool:
-    """A report folder renamed into place: one with the files only a whole report has."""
-    return output.is_dir() and (output / "SHA256SUMS").is_file() and (output / "report.toml").is_file()
 
 
 def _stop_on_signals(previous: dict) -> None:

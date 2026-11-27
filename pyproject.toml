@@ -34,7 +34,8 @@ Changelog = "https://github.com/Real-Fruit-Snacks/pwn-report/blob/main/CHANGELOG
 pwn-report = "pwn_report.cli:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+# markdown-it-py reads report.md back in the tests, as a Markdown viewer would; without it they skip
+dev = ["pytest>=8", "markdown-it-py>=3"]
 
 [tool.hatch.version]
 path = "src/pwn_report/__init__.py"

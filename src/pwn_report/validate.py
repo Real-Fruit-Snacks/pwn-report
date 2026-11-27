@@ -248,7 +248,9 @@ def validate_model(model: dict) -> dict:
         references = _strings(item["target_refs"], f"{label}.target_refs", nonempty=True)
         if references != sorted(references):
             _fail(f"{label}.target_refs", "must be sorted")
-        if set(references) - set(target_by_name):
+        # one lookup for each reference: a set of every target, made again for each file, cost
+        # the number of targets times the number of files
+        if any(reference not in target_by_name for reference in references):
             _fail(f"{label}.target_refs", "references an unknown target")
         if expected_target and expected_target not in references:
             _fail(f"{label}.target_refs", "must include the original target")
