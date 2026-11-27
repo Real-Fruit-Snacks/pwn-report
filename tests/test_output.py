@@ -140,7 +140,7 @@ def test_h06_h08_a01_a02_selected_output_notes_links_and_checksums(tmp_path):
     ]
     assert metadata == {
         "generator": "pwn-report",
-        "generator_version": "0.1.0",
+        "generator_version": "0.1.1",
         "schema_version": 1,
         "profile": "private-technical",
         "box_id": model["box"]["id"],

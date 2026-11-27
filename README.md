@@ -8,9 +8,9 @@ Private, evidence-linked reports from pwn-broker archives
 </picture>
 
 ```sh
-curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/pwn_report-0.1.0-py3-none-any.whl
-curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/SHA256SUMS.txt
-sha256sum -c --ignore-missing SHA256SUMS.txt && pipx install ./pwn_report-0.1.0-py3-none-any.whl
+curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.1/pwn_report-0.1.1-py3-none-any.whl
+curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.1/SHA256SUMS.txt
+sha256sum -c --ignore-missing SHA256SUMS.txt && pipx install ./pwn_report-0.1.1-py3-none-any.whl
 ```
 
 - **Usage:** `pwn-report build <archive> [-o <folder>] [--select <file>]` — writes `report.md`, `report.json`, `report.toml`, `SHA256SUMS`, and linked `evidence/` atomically beside the archive without overwriting existing reports.

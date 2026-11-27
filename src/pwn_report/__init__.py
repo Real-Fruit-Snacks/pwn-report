@@ -1,6 +1,6 @@
 """Deterministic archive-to-model and private-report builders."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from .output import build_report  # noqa: E402
 from .report import ReportError, build_model  # noqa: E402

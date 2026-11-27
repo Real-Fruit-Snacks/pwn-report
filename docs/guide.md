@@ -5,13 +5,13 @@
 Python 3.11 or later; pwn-report uses only the standard library. Each release publishes three files: the wheel `pwn_report-<version>-py3-none-any.whl`, the sdist `pwn_report-<version>.tar.gz`, and `SHA256SUMS.txt` with the SHA-256 of both. Check the file against `SHA256SUMS.txt` before installing it:
 
 ```sh
-curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/pwn_report-0.1.0-py3-none-any.whl
-curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.0/SHA256SUMS.txt
+curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.1/pwn_report-0.1.1-py3-none-any.whl
+curl -fsSLO https://github.com/Real-Fruit-Snacks/pwn-report/releases/download/v0.1.1/SHA256SUMS.txt
 sha256sum -c --ignore-missing SHA256SUMS.txt
-pipx install ./pwn_report-0.1.0-py3-none-any.whl
+pipx install ./pwn_report-0.1.1-py3-none-any.whl
 ```
 
-On Kali, `pipx` comes from `sudo apt install pipx`; Kali's Python refuses a plain `pip install` outside a virtual environment. On Windows or macOS, make a virtual environment and run `python -m pip install pwn_report-0.1.0-py3-none-any.whl` in it. From a checkout, `python -m pip install .`.
+On Kali, `pipx` comes from `sudo apt install pipx`; Kali's Python refuses a plain `pip install` outside a virtual environment. On Windows or macOS, make a virtual environment and run `python -m pip install pwn_report-0.1.1-py3-none-any.whl` in it. From a checkout, `python -m pip install .`.
 
 In a pwn-broker box, `tool install report` installs this release from pwn-shop's `report` package, on pwn-shop's own Python 3.13, and `finish` takes it off again. From pwn-broker 0.1.12, `finish` runs `pwn-report build` on the finished archive by itself, before the tools come off, and puts the report beside it as `<archive minus .tar.gz>.report`, or `.report-2` beside an earlier one. A report that fails is a warning there, and the finish goes on.
 

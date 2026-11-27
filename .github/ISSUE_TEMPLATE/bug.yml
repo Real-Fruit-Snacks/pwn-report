@@ -7,7 +7,7 @@ body:
     attributes:
       label: Versions
       description: pwn-report (`pwn-report --version`), Python (`python3 --version`), and pwn-broker if the archive came from it (`pwn-broker --version`)
-      placeholder: pwn-report 0.1.0, Python 3.13.5, pwn-broker 0.1.14
+      placeholder: pwn-report 0.1.1, Python 3.13.5, pwn-broker 0.1.14
     validations:
       required: true
   - type: dropdown
