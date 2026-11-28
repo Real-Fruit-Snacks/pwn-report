@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.2 (unreleased)
+
+- Dependabot raises the workflows' action pins: once a month it opens one pull request for every action with a newer release. It watches the actions only.
+
 ## v0.1.1
 
 - A name that begins like a Markdown block stays text in `report.md`. A file named `# Reviewed and approved`, `- -`, `1. x` or with four leading spaces, or a flag with such a name, was drawn as a heading, a rule, a list or a code block, and a `#` at the end of a heading was dropped. What a value starts with is now escaped where it could start a block, `#` is escaped everywhere, and a space at either end is written as `&#32;`.
